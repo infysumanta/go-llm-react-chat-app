@@ -1,18 +1,15 @@
-package main
+package llm
 
 import (
 	"context"
 	"os"
 
 	openai "github.com/sashabaranov/go-openai"
+
+	"github.com/infysumanta/go-llm-react-chat-app/internal/model"
 )
 
-type OpenAIMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
-func StreamChat(messages []OpenAIMessage, model string, stream chan string) {
+func StreamChat(messages []model.OpenAIMessage, modelName string, stream chan string) {
 	client := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
 
 	var chatMessages []openai.ChatCompletionMessage
@@ -24,7 +21,7 @@ func StreamChat(messages []OpenAIMessage, model string, stream chan string) {
 	}
 
 	req := openai.ChatCompletionRequest{
-		Model:    model,
+		Model:    modelName,
 		Messages: chatMessages,
 		Stream:   true,
 	}
@@ -35,7 +32,7 @@ func StreamChat(messages []OpenAIMessage, model string, stream chan string) {
 		close(stream)
 		return
 	}
-	defer resp.Close()
+	defer resp.Close() //nolint:errcheck // best-effort cleanup
 
 	for {
 		response, err := resp.Recv()

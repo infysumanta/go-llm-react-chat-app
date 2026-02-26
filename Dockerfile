@@ -12,6 +12,7 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY *.go ./
+COPY internal/ ./internal/
 COPY --from=frontend /app/dist ./dist/
 RUN CGO_ENABLED=0 go build -o llm-chat .
 

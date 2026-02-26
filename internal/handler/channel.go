@@ -1,4 +1,4 @@
-package main
+package handler
 
 import (
 	"database/sql"
@@ -6,16 +6,18 @@ import (
 	"net/http"
 	"time"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/infysumanta/go-llm-react-chat-app/internal/model"
+	"github.com/infysumanta/go-llm-react-chat-app/internal/telegram"
+
 	"github.com/google/uuid"
 )
 
 type ChannelHandlers struct {
 	db         *sql.DB
-	botManager *BotManager
+	botManager *telegram.BotManager
 }
 
-func NewChannelHandlers(db *sql.DB, bm *BotManager) *ChannelHandlers {
+func NewChannelHandlers(db *sql.DB, bm *telegram.BotManager) *ChannelHandlers {
 	return &ChannelHandlers{db: db, botManager: bm}
 }
 
@@ -30,9 +32,9 @@ func (ch *ChannelHandlers) ListChannels(w http.ResponseWriter, r *http.Request) 
 	}
 	defer rows.Close()
 
-	channels := []Channel{}
+	channels := []model.Channel{}
 	for rows.Next() {
-		var c Channel
+		var c model.Channel
 		var enabled int
 		if err := rows.Scan(&c.ID, &c.Name, &c.Type, &c.SystemPrompt, &c.Model, &enabled, &c.BotUsername, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -64,17 +66,16 @@ func (ch *ChannelHandlers) CreateChannel(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "name and botToken are required", http.StatusBadRequest)
 		return
 	}
-	if req.Model == "" || !IsValidModel(req.Model) {
+	if req.Model == "" || !model.IsValidModel(req.Model) {
 		req.Model = "gpt-5-nano"
 	}
 
 	// Validate the bot token with Telegram API
-	bot, err := tgbotapi.NewBotAPI(req.BotToken)
+	botUsername, err := telegram.ValidateBotToken(req.BotToken)
 	if err != nil {
 		http.Error(w, "Invalid bot token: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	botUsername := bot.Self.UserName
 
 	id := uuid.New().String()
 	now := time.Now()
@@ -88,14 +89,14 @@ func (ch *ChannelHandlers) CreateChannel(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	channel := Channel{
+	channel := model.Channel{
 		ID:           id,
 		Name:         req.Name,
 		Type:         "telegram",
 		SystemPrompt: req.SystemPrompt,
 		Model:        req.Model,
 		Enabled:      true,
-		BotUsername:   botUsername,
+		BotUsername:  botUsername,
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
@@ -114,7 +115,7 @@ func (ch *ChannelHandlers) CreateChannel(w http.ResponseWriter, r *http.Request)
 func (ch *ChannelHandlers) GetChannel(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
-	var c Channel
+	var c model.Channel
 	var enabled int
 	err := ch.db.QueryRow(
 		"SELECT id, name, type, system_prompt, model, enabled, bot_username, created_at, updated_at FROM channels WHERE id = ?", id,
@@ -149,7 +150,7 @@ func (ch *ChannelHandlers) UpdateChannel(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Fetch current channel
-	var c Channel
+	var c model.Channel
 	var enabled int
 	var botToken string
 	err := ch.db.QueryRow(
@@ -173,7 +174,7 @@ func (ch *ChannelHandlers) UpdateChannel(w http.ResponseWriter, r *http.Request)
 	if req.SystemPrompt != nil {
 		c.SystemPrompt = *req.SystemPrompt
 	}
-	if req.Model != nil && IsValidModel(*req.Model) {
+	if req.Model != nil && model.IsValidModel(*req.Model) {
 		c.Model = *req.Model
 	}
 	if req.Enabled != nil {
@@ -224,14 +225,14 @@ func (ch *ChannelHandlers) ListChannelConversations(w http.ResponseWriter, r *ht
 	}
 	defer rows.Close()
 
-	type ConvWithCount struct {
-		Conversation
+	type convWithCount struct {
+		model.Conversation
 		MessageCount int `json:"messageCount"`
 	}
 
-	convs := []ConvWithCount{}
+	convs := []convWithCount{}
 	for rows.Next() {
-		var c ConvWithCount
+		var c convWithCount
 		if err := rows.Scan(&c.ID, &c.Title, &c.Model, &c.Channel, &c.ChannelID, &c.TelegramChatID, &c.CreatedAt, &c.UpdatedAt, &c.MessageCount); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

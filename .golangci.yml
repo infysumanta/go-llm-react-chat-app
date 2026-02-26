@@ -1,0 +1,55 @@
+version: "2"
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - unused
+    - ineffassign
+    - misspell
+    - gocritic
+    - revive
+
+  settings:
+    errcheck:
+      exclude-functions:
+        - (*database/sql.DB).Exec
+        - (*database/sql.DB).Close
+        - (*database/sql.Rows).Close
+        - (net/http.ResponseWriter).Write
+        - (*encoding/json.Encoder).Encode
+        - (io.Closer).Close
+        - os.MkdirAll
+        - (*github.com/go-telegram-bot-api/telegram-bot-api/v5.BotAPI).Send
+        - github.com/joho/godotenv.Load
+    revive:
+      rules:
+        - name: exported
+          disabled: true
+        - name: package-comments
+          disabled: true
+        - name: blank-imports
+          disabled: true
+        - name: unused-parameter
+          disabled: true
+
+  exclusions:
+    paths:
+      - frontend
+      - dist
+      - tmp
+      - _db
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/infysumanta/go-llm-react-chat-app
+
+run:
+  timeout: 5m

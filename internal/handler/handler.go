@@ -1,4 +1,4 @@
-package main
+package handler
 
 import (
 	"database/sql"
@@ -6,6 +6,9 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/infysumanta/go-llm-react-chat-app/internal/llm"
+	"github.com/infysumanta/go-llm-react-chat-app/internal/model"
 
 	"github.com/google/uuid"
 )
@@ -31,7 +34,7 @@ func (h *Handlers) HealthCheck(w http.ResponseWriter, r *http.Request) {
 // GET /api/models
 func (h *Handlers) ListModels(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(AvailableModels)
+	json.NewEncoder(w).Encode(model.AvailableModels)
 }
 
 // GET /api/conversations
@@ -45,9 +48,9 @@ func (h *Handlers) ListConversations(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	conversations := []Conversation{}
+	conversations := []model.Conversation{}
 	for rows.Next() {
-		var c Conversation
+		var c model.Conversation
 		if err := rows.Scan(&c.ID, &c.Title, &c.Model, &c.Channel, &c.ChannelID, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -73,7 +76,7 @@ func (h *Handlers) CreateConversation(w http.ResponseWriter, r *http.Request) {
 	if req.Title == "" {
 		req.Title = "New Chat"
 	}
-	if req.Model == "" || !IsValidModel(req.Model) {
+	if req.Model == "" || !model.IsValidModel(req.Model) {
 		req.Model = "gpt-5-nano"
 	}
 
@@ -89,7 +92,7 @@ func (h *Handlers) CreateConversation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	conv := Conversation{
+	conv := model.Conversation{
 		ID:        id,
 		Title:     req.Title,
 		Model:     req.Model,
@@ -107,7 +110,7 @@ func (h *Handlers) CreateConversation(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) GetConversation(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
-	var conv Conversation
+	var conv model.Conversation
 	err := h.db.QueryRow(
 		"SELECT id, title, model, channel, channel_id, created_at, updated_at FROM conversations WHERE id = ?", id,
 	).Scan(&conv.ID, &conv.Title, &conv.Model, &conv.Channel, &conv.ChannelID, &conv.CreatedAt, &conv.UpdatedAt)
@@ -129,16 +132,16 @@ func (h *Handlers) GetConversation(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	conv.Messages = []Message{}
+	conv.Messages = []model.Message{}
 	for rows.Next() {
-		var m Message
-		var model sql.NullString
-		if err := rows.Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &model, &m.Channel, &m.CreatedAt); err != nil {
+		var m model.Message
+		var mdl sql.NullString
+		if err := rows.Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &mdl, &m.Channel, &m.CreatedAt); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		if model.Valid {
-			m.Model = model.String
+		if mdl.Valid {
+			m.Model = mdl.String
 		}
 		conv.Messages = append(conv.Messages, m)
 	}
@@ -167,20 +170,20 @@ func (h *Handlers) DeleteConversation(w http.ResponseWriter, r *http.Request) {
 }
 
 // AI SDK chat request format
-type AIChatRequest struct {
-	ID             string          `json:"id"`
-	Messages       []AIMessage     `json:"messages"`
-	Model          string          `json:"model"`
-	ConversationID string          `json:"conversationId"`
+type aiChatRequest struct {
+	ID             string      `json:"id"`
+	Messages       []aiMessage `json:"messages"`
+	Model          string      `json:"model"`
+	ConversationID string      `json:"conversationId"`
 }
 
-type AIMessage struct {
+type aiMessage struct {
 	ID    string   `json:"id"`
 	Role  string   `json:"role"`
-	Parts []AIPart `json:"parts"`
+	Parts []aiPart `json:"parts"`
 }
 
-type AIPart struct {
+type aiPart struct {
 	Type string `json:"type"`
 	Text string `json:"text"`
 }
@@ -192,15 +195,15 @@ func (h *Handlers) Chat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req AIChatRequest
+	var req aiChatRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
 
-	model := req.Model
-	if model == "" || !IsValidModel(model) {
-		model = "gpt-5-nano"
+	modelName := req.Model
+	if modelName == "" || !model.IsValidModel(modelName) {
+		modelName = "gpt-5-nano"
 	}
 
 	// Extract the last user message text
@@ -230,7 +233,7 @@ func (h *Handlers) Chat(w http.ResponseWriter, r *http.Request) {
 		}
 		_, err := h.db.Exec(
 			"INSERT INTO conversations (id, title, model, channel, created_at, updated_at) VALUES (?, ?, ?, 'web', ?, ?)",
-			convID, title, model, time.Now(), time.Now(),
+			convID, title, modelName, time.Now(), time.Now(),
 		)
 		if err != nil {
 			http.Error(w, "Failed to create conversation", http.StatusInternalServerError)
@@ -269,7 +272,7 @@ func (h *Handlers) Chat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	stream := make(chan string)
-	go StreamChat(openaiMessages, model, stream)
+	go llm.StreamChat(openaiMessages, modelName, stream)
 
 	var fullResponse strings.Builder
 	for chunk := range stream {
@@ -283,13 +286,13 @@ func (h *Handlers) Chat(w http.ResponseWriter, r *http.Request) {
 		assistantMsgID := uuid.New().String()
 		h.db.Exec(
 			"INSERT INTO messages (id, conversation_id, role, content, model, channel, created_at) VALUES (?, ?, ?, ?, ?, 'web', ?)",
-			assistantMsgID, convID, "assistant", fullResponse.String(), model, time.Now(),
+			assistantMsgID, convID, "assistant", fullResponse.String(), modelName, time.Now(),
 		)
 	}
 }
 
-func convertToOpenAIMessages(messages []AIMessage) []OpenAIMessage {
-	var result []OpenAIMessage
+func convertToOpenAIMessages(messages []aiMessage) []model.OpenAIMessage {
+	var result []model.OpenAIMessage
 	for _, msg := range messages {
 		var text strings.Builder
 		for _, part := range msg.Parts {
@@ -297,7 +300,7 @@ func convertToOpenAIMessages(messages []AIMessage) []OpenAIMessage {
 				text.WriteString(part.Text)
 			}
 		}
-		result = append(result, OpenAIMessage{
+		result = append(result, model.OpenAIMessage{
 			Role:    msg.Role,
 			Content: text.String(),
 		})

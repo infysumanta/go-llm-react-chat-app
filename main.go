@@ -8,6 +8,10 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/infysumanta/go-llm-react-chat-app/internal/handler"
+	"github.com/infysumanta/go-llm-react-chat-app/internal/store"
+	"github.com/infysumanta/go-llm-react-chat-app/internal/telegram"
+
 	"github.com/joho/godotenv"
 )
 
@@ -17,19 +21,19 @@ var staticFiles embed.FS
 func main() {
 	godotenv.Load()
 
-	db, err := InitDB()
+	db, err := store.InitDB()
 	if err != nil {
 		log.Fatal("Failed to initialize database:", err)
 	}
 	defer db.Close()
 
-	h := NewHandlers(db)
+	h := handler.NewHandlers(db)
 
 	// Start Telegram bot manager
-	botManager := NewBotManager(db)
+	botManager := telegram.NewBotManager(db)
 	go botManager.LoadAndStartAll()
 
-	ch := NewChannelHandlers(db, botManager)
+	ch := handler.NewChannelHandlers(db, botManager)
 
 	mux := http.NewServeMux()
 
@@ -53,7 +57,8 @@ func main() {
 	// Static files with SPA fallback for client-side routing
 	distFS, err := fs.Sub(staticFiles, "dist")
 	if err != nil {
-		log.Fatal("Failed to load static files:", err)
+		log.Println("Failed to load static files:", err)
+		return
 	}
 	fileServer := http.FileServer(http.FS(distFS))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -64,7 +69,7 @@ func main() {
 		path := strings.TrimPrefix(r.URL.Path, "/")
 		if path != "" {
 			if f, err := distFS.Open(path); err == nil {
-				f.Close()
+				_ = f.Close()
 				fileServer.ServeHTTP(w, r)
 				return
 			}
@@ -75,5 +80,7 @@ func main() {
 	})
 
 	fmt.Println("Server running on http://localhost:8080")
-	log.Fatal(http.ListenAndServe(":8080", mux))
+	if err := http.ListenAndServe(":8080", mux); err != nil {
+		log.Println("Server stopped:", err)
+	}
 }

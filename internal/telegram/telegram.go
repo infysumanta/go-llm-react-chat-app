@@ -1,4 +1,4 @@
-package main
+package telegram
 
 import (
 	"database/sql"
@@ -8,18 +8,30 @@ import (
 	"sync"
 	"time"
 
+	"github.com/infysumanta/go-llm-react-chat-app/internal/llm"
+	"github.com/infysumanta/go-llm-react-chat-app/internal/model"
+
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/google/uuid"
 )
 
+// ValidateBotToken validates a Telegram bot token and returns the bot username.
+func ValidateBotToken(token string) (string, error) {
+	bot, err := tgbotapi.NewBotAPI(token)
+	if err != nil {
+		return "", err
+	}
+	return bot.Self.UserName, nil
+}
+
 type BotManager struct {
 	db   *sql.DB
 	mu   sync.RWMutex
-	bots map[string]*TelegramBot // keyed by channel ID
+	bots map[string]*telegramBot // keyed by channel ID
 }
 
-type TelegramBot struct {
-	channel    Channel
+type telegramBot struct {
+	channel    model.Channel
 	api        *tgbotapi.BotAPI
 	stop       chan struct{}
 	done       chan struct{}
@@ -29,7 +41,7 @@ type TelegramBot struct {
 func NewBotManager(db *sql.DB) *BotManager {
 	return &BotManager{
 		db:   db,
-		bots: make(map[string]*TelegramBot),
+		bots: make(map[string]*telegramBot),
 	}
 }
 
@@ -45,7 +57,7 @@ func (bm *BotManager) LoadAndStartAll() {
 	defer rows.Close()
 
 	for rows.Next() {
-		var c Channel
+		var c model.Channel
 		var enabled int
 		if err := rows.Scan(&c.ID, &c.Name, &c.Type, &c.BotToken, &c.SystemPrompt, &c.Model, &enabled, &c.BotUsername, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			log.Printf("BotManager: failed to scan channel: %v", err)
@@ -57,7 +69,7 @@ func (bm *BotManager) LoadAndStartAll() {
 }
 
 // StartBot starts a single Telegram bot for the given channel.
-func (bm *BotManager) StartBot(channel Channel) {
+func (bm *BotManager) StartBot(channel model.Channel) {
 	// Stop existing bot if already running and wait for it to finish
 	bm.mu.Lock()
 	existing, hadExisting := bm.bots[channel.ID]
@@ -77,7 +89,7 @@ func (bm *BotManager) StartBot(channel Channel) {
 		return
 	}
 
-	tb := &TelegramBot{
+	tb := &telegramBot{
 		channel: channel,
 		api:     bot,
 		stop:    make(chan struct{}),
@@ -110,12 +122,12 @@ func (bm *BotManager) StopBot(channelID string) {
 }
 
 // RestartBot stops and restarts a bot with updated config.
-func (bm *BotManager) RestartBot(channel Channel) {
+func (bm *BotManager) RestartBot(channel model.Channel) {
 	bm.StopBot(channel.ID)
 	bm.StartBot(channel)
 }
 
-func (bm *BotManager) runBot(tb *TelegramBot) {
+func (bm *BotManager) runBot(tb *telegramBot) {
 	defer close(tb.done)
 
 	// Register bot commands with Telegram
@@ -151,7 +163,7 @@ func (bm *BotManager) runBot(tb *TelegramBot) {
 	}
 }
 
-func (bm *BotManager) handleCommand(tb *TelegramBot, msg *tgbotapi.Message) {
+func (bm *BotManager) handleCommand(tb *telegramBot, msg *tgbotapi.Message) {
 	chatID := msg.Chat.ID
 
 	switch msg.Command() {
@@ -212,7 +224,7 @@ func (bm *BotManager) handleCommand(tb *TelegramBot, msg *tgbotapi.Message) {
 	}
 }
 
-func (bm *BotManager) handleMessage(tb *TelegramBot, msg *tgbotapi.Message) {
+func (bm *BotManager) handleMessage(tb *telegramBot, msg *tgbotapi.Message) {
 	chatID := msg.Chat.ID
 
 	if msg.IsCommand() {
@@ -257,17 +269,17 @@ func (bm *BotManager) handleMessage(tb *TelegramBot, msg *tgbotapi.Message) {
 	messages, err := bm.loadHistory(convID)
 	if err != nil {
 		log.Printf("BotManager: failed to load history: %v", err)
-		messages = []OpenAIMessage{}
+		messages = []model.OpenAIMessage{}
 	}
 
 	// Prepend system prompt if configured
 	if tb.channel.SystemPrompt != "" {
-		messages = append([]OpenAIMessage{{Role: "system", Content: tb.channel.SystemPrompt}}, messages...)
+		messages = append([]model.OpenAIMessage{{Role: "system", Content: tb.channel.SystemPrompt}}, messages...)
 	}
 
 	// Call LLM
 	stream := make(chan string)
-	go StreamChat(messages, tb.channel.Model, stream)
+	go llm.StreamChat(messages, tb.channel.Model, stream)
 
 	var fullResponse strings.Builder
 	for chunk := range stream {
@@ -290,7 +302,7 @@ func (bm *BotManager) handleMessage(tb *TelegramBot, msg *tgbotapi.Message) {
 	bm.sendTelegramResponse(tb, chatID, responseText)
 }
 
-func (bm *BotManager) findOrCreateConversation(tb *TelegramBot, chatID int64, firstMsg string, forceNew bool) (string, error) {
+func (bm *BotManager) findOrCreateConversation(tb *telegramBot, chatID int64, firstMsg string, forceNew bool) (string, error) {
 	if !forceNew {
 		var convID string
 		err := bm.db.QueryRow(
@@ -321,7 +333,7 @@ func (bm *BotManager) findOrCreateConversation(tb *TelegramBot, chatID int64, fi
 	return convID, nil
 }
 
-func (bm *BotManager) loadHistory(convID string) ([]OpenAIMessage, error) {
+func (bm *BotManager) loadHistory(convID string) ([]model.OpenAIMessage, error) {
 	rows, err := bm.db.Query(
 		"SELECT role, content FROM messages WHERE conversation_id = ? ORDER BY created_at ASC",
 		convID,
@@ -331,9 +343,9 @@ func (bm *BotManager) loadHistory(convID string) ([]OpenAIMessage, error) {
 	}
 	defer rows.Close()
 
-	var messages []OpenAIMessage
+	var messages []model.OpenAIMessage
 	for rows.Next() {
-		var m OpenAIMessage
+		var m model.OpenAIMessage
 		if err := rows.Scan(&m.Role, &m.Content); err != nil {
 			return nil, err
 		}
@@ -342,7 +354,7 @@ func (bm *BotManager) loadHistory(convID string) ([]OpenAIMessage, error) {
 	return messages, nil
 }
 
-func (bm *BotManager) sendTelegramResponse(tb *TelegramBot, chatID int64, text string) {
+func (bm *BotManager) sendTelegramResponse(tb *telegramBot, chatID int64, text string) {
 	const maxLen = 4096
 
 	for len(text) > 0 {

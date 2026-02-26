@@ -1,4 +1,4 @@
-.PHONY: all build run dev clean deps frontend backend docker docker-run compose compose-down
+.PHONY: all build run dev clean deps frontend backend docker docker-run compose compose-down fmt lint lint-fix check
 
 BINARY := llm-chat
 IMAGE := llm-chat
@@ -59,6 +59,23 @@ compose:
 # Stop Docker Compose
 compose-down:
 	docker compose down
+
+# Format Go source files
+fmt:
+	gofmt -w .
+	goimports -w -local github.com/infysumanta/go-llm-react-chat-app .
+
+# Run linter
+lint:
+	golangci-lint run ./...
+
+# Run linter with auto-fix
+lint-fix:
+	golangci-lint run --fix ./...
+
+# Run all checks: fmt + lint + vet
+check: fmt lint
+	go vet ./...
 
 # Clean build artifacts
 clean:
