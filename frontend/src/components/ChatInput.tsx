@@ -1,97 +1,176 @@
-import { type FormEvent, useRef } from "react";
+import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
+import {
+  ModelSelector,
+  ModelSelectorContent,
+  ModelSelectorEmpty,
+  ModelSelectorGroup,
+  ModelSelectorInput,
+  ModelSelectorItem,
+  ModelSelectorList,
+  ModelSelectorLogo,
+  ModelSelectorLogoGroup,
+  ModelSelectorName,
+  ModelSelectorTrigger,
+} from "@/components/ai-elements/model-selector";
 import {
   PromptInput,
+  PromptInputBody,
+  PromptInputButton,
+  PromptInputFooter,
+  PromptInputProvider,
+  PromptInputSubmit,
   PromptInputTextarea,
-  PromptInputActions,
-} from "@/components/ui/prompt-input";
+  PromptInputTools,
+} from "@/components/ai-elements/prompt-input";
+import { groupModelsByProvider } from "@/lib/models";
+import type { Model } from "@/types";
+import type { ChatStatus } from "ai";
+import { CheckIcon } from "lucide-react";
+import { memo, useCallback, useState } from "react";
 
 interface ChatInputProps {
   onSend: (text: string) => void;
   isStreaming: boolean;
   onStop: () => void;
+  models: Model[];
+  selectedModel: string;
+  onModelChange: (model: string) => void;
+  status: ChatStatus;
 }
+
+const providerSlugMap: Record<string, string> = {
+  OpenAI: "openai",
+  Anthropic: "anthropic",
+  Google: "google",
+  Groq: "groq",
+  Mistral: "mistral",
+  Cohere: "cohere",
+  Ollama: "llama",
+  "LM Studio": "lmstudio",
+};
+
+function getProviderSlug(provider: string): string {
+  return providerSlugMap[provider] ?? provider.toLowerCase();
+}
+
+interface ModelItemProps {
+  model: Model;
+  selectedModel: string;
+  onSelect: (id: string) => void;
+}
+
+const ModelItem = memo(({ model, selectedModel, onSelect }: ModelItemProps) => {
+  const handleSelect = useCallback(
+    () => onSelect(model.id),
+    [onSelect, model.id],
+  );
+  const slug = getProviderSlug(model.provider);
+  return (
+    <ModelSelectorItem onSelect={handleSelect} value={model.id}>
+      <ModelSelectorLogo provider={slug} />
+      <ModelSelectorName>{model.name}</ModelSelectorName>
+      <ModelSelectorLogoGroup>
+        <ModelSelectorLogo provider={slug} />
+      </ModelSelectorLogoGroup>
+      {selectedModel === model.id ? (
+        <CheckIcon className="ml-auto size-4" />
+      ) : (
+        <div className="ml-auto size-4" />
+      )}
+    </ModelSelectorItem>
+  );
+});
+ModelItem.displayName = "ModelItem";
 
 export default function ChatInput({
   onSend,
-  isStreaming,
   onStop,
+  models,
+  selectedModel,
+  onModelChange,
+  status,
 }: ChatInputProps) {
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const inputRef = useRef("");
+  const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
+  const groups = groupModelsByProvider(models);
 
-  const handleSubmit = (e?: FormEvent) => {
-    e?.preventDefault();
-    const text = textareaRef.current?.value?.trim();
-    if (!text || isStreaming) return;
-    onSend(text);
-    if (textareaRef.current) {
-      textareaRef.current.value = "";
-      textareaRef.current.style.height = "auto";
-    }
-    inputRef.current = "";
-  };
+  const selectedModelData = models.find((m) => m.id === selectedModel);
+
+  const handleModelSelect = useCallback(
+    (id: string) => {
+      onModelChange(id);
+      setModelSelectorOpen(false);
+    },
+    [onModelChange],
+  );
+
+  const handleSubmit = useCallback(
+    (message: PromptInputMessage) => {
+      if (!message.text?.trim()) return;
+      onSend(message.text);
+    },
+    [onSend],
+  );
 
   return (
     <div className="border-t border-gray-800 bg-gray-900/80 backdrop-blur-sm px-4 py-3">
-      <form
-        onSubmit={handleSubmit}
-        className="max-w-3xl mx-auto"
-      >
-        <PromptInput>
-          <PromptInputTextarea
-            ref={textareaRef}
-            onChange={(e) => {
-              inputRef.current = e.target.value;
-            }}
-            onSubmit={handleSubmit}
-            placeholder="Type a message..."
-          />
-          <PromptInputActions>
-            {isStreaming ? (
-              <button
-                type="button"
-                onClick={onStop}
-                className="flex-shrink-0 w-8 h-8 rounded-lg bg-red-600 hover:bg-red-500 flex items-center justify-center transition-colors cursor-pointer"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
+      <div className="max-w-3xl mx-auto">
+        <PromptInputProvider>
+          <PromptInput onSubmit={handleSubmit}>
+            <PromptInputBody>
+              <PromptInputTextarea placeholder="Send a message" />
+            </PromptInputBody>
+            <PromptInputFooter>
+              <PromptInputTools>
+                <ModelSelector
+                  onOpenChange={setModelSelectorOpen}
+                  open={modelSelectorOpen}
                 >
-                  <title>Stop</title>
-                  <rect x="6" y="6" width="12" height="12" rx="2" />
-                </svg>
-              </button>
-            ) : (
-              <button
-                type="submit"
-                className="flex-shrink-0 w-8 h-8 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center transition-colors cursor-pointer"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <title>Send</title>
-                  <path d="m5 12 7-7 7 7" />
-                  <path d="M12 19V5" />
-                </svg>
-              </button>
-            )}
-          </PromptInputActions>
-        </PromptInput>
-      </form>
-      <p className="text-center text-xs text-gray-600 mt-2">
-        Press Enter to send, Shift+Enter for new line
-      </p>
+                  <ModelSelectorTrigger asChild>
+                    <PromptInputButton>
+                      {selectedModelData && (
+                        <ModelSelectorLogo
+                          provider={getProviderSlug(
+                            selectedModelData.provider,
+                          )}
+                        />
+                      )}
+                      {selectedModelData && (
+                        <ModelSelectorName>
+                          {selectedModelData.name}
+                        </ModelSelectorName>
+                      )}
+                    </PromptInputButton>
+                  </ModelSelectorTrigger>
+                  <ModelSelectorContent>
+                    <ModelSelectorInput placeholder="Search models..." />
+                    <ModelSelectorList>
+                      <ModelSelectorEmpty>
+                        No models found.
+                      </ModelSelectorEmpty>
+                      {groups.map((group) => (
+                        <ModelSelectorGroup
+                          heading={group.provider}
+                          key={group.provider}
+                        >
+                          {group.models.map((m) => (
+                            <ModelItem
+                              key={m.id}
+                              model={m}
+                              onSelect={handleModelSelect}
+                              selectedModel={selectedModel}
+                            />
+                          ))}
+                        </ModelSelectorGroup>
+                      ))}
+                    </ModelSelectorList>
+                  </ModelSelectorContent>
+                </ModelSelector>
+              </PromptInputTools>
+              <PromptInputSubmit status={status} onStop={onStop} />
+            </PromptInputFooter>
+          </PromptInput>
+        </PromptInputProvider>
+      </div>
     </div>
   );
 }

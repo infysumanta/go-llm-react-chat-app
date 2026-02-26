@@ -45,7 +45,6 @@ export default function ChatPage() {
       .then((r) => r.json())
       .then((data: Model[]) => {
         setModels(data);
-        // Set first available model as default if none selected
         const first = data[0];
         if (!selectedModel && first) {
           setSelectedModel(first.id);
@@ -81,13 +80,13 @@ export default function ChatPage() {
       setActiveChannel("web");
     }
   }, [id]);
+
   // After streaming completes, refresh conversations and navigate if new chat
   // biome-ignore lint/correctness/useExhaustiveDependencies: only re-run on status/messages.length change
   useEffect(() => {
     if (status === "ready" && messages.length > 0) {
       fetchConversations().then((convs) => {
         if (!id && convs && convs.length > 0) {
-          // Find the newest web conversation
           const newest = convs.find((c) => !c.channel || c.channel === "web");
           if (newest) {
             justCreated.current = true;
@@ -97,6 +96,7 @@ export default function ChatPage() {
       });
     }
   }, [status, messages.length]);
+
   const handleDeleteConversation = useCallback(
     async (convId: string) => {
       await deleteConversation(convId);
@@ -137,9 +137,6 @@ export default function ChatPage() {
       />
       <main className="flex-1 flex flex-col min-w-0">
         <ChatHeader
-          models={models}
-          selectedModel={selectedModel}
-          onModelChange={setSelectedModel}
           isOnline={isOnline}
           onOpenSettings={() => navigate("/settings")}
         />
@@ -175,6 +172,10 @@ export default function ChatPage() {
             onSend={handleSend}
             isStreaming={isStreaming}
             onStop={stop}
+            models={models}
+            selectedModel={selectedModel}
+            onModelChange={setSelectedModel}
+            status={status}
           />
         )}
       </main>
