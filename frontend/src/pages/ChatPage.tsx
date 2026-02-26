@@ -1,6 +1,6 @@
 import { useChat } from "@ai-sdk/react";
 import { TextStreamChatTransport } from "ai";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import ChatHeader from "@/components/ChatHeader";
@@ -27,12 +27,19 @@ export default function ChatPage() {
   } = useConversations();
   const { channels } = useChannels();
 
+  // Transport is created once — dynamic values (model, conversationId)
+  // are passed via sendMessage's body option instead.
+  const transport = useMemo(
+    () =>
+      new TextStreamChatTransport({
+        api: "/api/chat",
+        headers: { "Content-Type": "application/json" },
+      }),
+    [],
+  );
+
   const { messages, sendMessage, status, stop, setMessages } = useChat({
-    transport: new TextStreamChatTransport({
-      api: "/api/chat",
-      body: { conversationId: id || null, model: selectedModel },
-      headers: { "Content-Type": "application/json" },
-    }),
+    transport,
   });
 
   const isStreaming = status === "streaming" || status === "submitted";
@@ -109,9 +116,13 @@ export default function ChatPage() {
 
   const handleSend = useCallback(
     (text: string) => {
-      sendMessage({ text });
+      console.log("[ChatPage] Sending message with model:", selectedModel, "conversationId:", id || null);
+      sendMessage(
+        { text },
+        { body: { model: selectedModel, conversationId: id || null } },
+      );
     },
-    [sendMessage],
+    [sendMessage, selectedModel, id],
   );
 
   const handleSuggestion = useCallback(

@@ -3,6 +3,7 @@ package handler
 import (
 	"database/sql"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -242,16 +243,20 @@ func (h *Handlers) Chat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	modelName := req.Model
+	log.Printf("[Chat] Received request — model: %q, conversationId: %q", modelName, req.ConversationID)
 	if modelName == "" || !h.reg.IsValidModel(modelName) {
+		log.Printf("[Chat] Invalid/empty model %q, falling back to default: %q", modelName, h.reg.DefaultModel())
 		modelName = h.reg.DefaultModel()
 	}
 
 	// Resolve the provider for this model
 	p, err := h.reg.ProviderForModel(modelName)
 	if err != nil {
+		log.Printf("[Chat] No provider for model %q: %v", modelName, err)
 		http.Error(w, "No provider available for model: "+modelName, http.StatusBadRequest)
 		return
 	}
+	log.Printf("[Chat] Resolved provider: %s for model: %s", p.Name(), modelName)
 
 	// Extract the last user message text
 	var lastUserText string

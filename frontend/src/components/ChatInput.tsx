@@ -97,6 +97,7 @@ export default function ChatInput({
 
   const handleModelSelect = useCallback(
     (id: string) => {
+      console.log("[ChatInput] Model selected:", id);
       onModelChange(id);
       setModelSelectorOpen(false);
     },
@@ -106,9 +107,10 @@ export default function ChatInput({
   const handleSubmit = useCallback(
     (message: PromptInputMessage) => {
       if (!message.text?.trim()) return;
+      console.log("[ChatInput] Submitting with selectedModel:", selectedModel);
       onSend(message.text);
     },
-    [onSend],
+    [onSend, selectedModel],
   );
 
   return (
