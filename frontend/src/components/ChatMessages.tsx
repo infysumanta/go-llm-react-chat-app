@@ -1,5 +1,8 @@
 import type { UIMessage } from "ai";
 import { useEffect, useRef } from "react";
+import { Streamdown } from "streamdown";
+import { code } from "@streamdown/code";
+import "streamdown/styles.css";
 
 interface ChatMessagesProps {
   messages: UIMessage[];
@@ -21,7 +24,7 @@ export default function ChatMessages({
 
   return (
     <div className="max-w-3xl mx-auto w-full px-4 py-6 space-y-6">
-      {messages.map((msg) => (
+      {messages.map((msg, index) => (
         <div
           key={msg.id}
           className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
@@ -50,16 +53,36 @@ export default function ChatMessages({
             </div>
           )}
           <div
-            className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
+            className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
               msg.role === "user"
-                ? "bg-violet-600 text-white rounded-br-md"
+                ? "bg-violet-600 text-white rounded-br-md whitespace-pre-wrap"
                 : "bg-gray-800 text-gray-100 rounded-bl-md"
             }`}
           >
-            {getMessageText(msg)}
-            {msg.role === "assistant" &&
-              getMessageText(msg) === "" &&
-              isStreaming && <TypingIndicator />}
+            {msg.role === "assistant" ? (
+              getMessageText(msg) === "" && isStreaming ? (
+                <TypingIndicator />
+              ) : (
+                <Streamdown
+                  animated={{
+                    animation: "blurIn",
+                    duration: 200,
+                    easing: "ease-out",
+                  }}
+                  isAnimating={isStreaming && index === messages.length - 1}
+                  caret={
+                    isStreaming && index === messages.length - 1
+                      ? "block"
+                      : undefined
+                  }
+                  plugins={{ code }}
+                >
+                  {getMessageText(msg)}
+                </Streamdown>
+              )
+            ) : (
+              getMessageText(msg)
+            )}
           </div>
           {msg.role === "user" && (
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-fuchsia-500 to-pink-500 flex-shrink-0 flex items-center justify-center mt-1 text-xs font-bold">
