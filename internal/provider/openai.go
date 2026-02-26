@@ -23,13 +23,13 @@ func NewOpenAIProvider(apiKey string) *OpenAICompatibleProvider {
 		name:   "OpenAI",
 		apiKey: apiKey,
 		models: []ModelInfo{
-			{ID: "gpt-5", Name: "GPT-5", Provider: "OpenAI"},
-			{ID: "gpt-5-mini", Name: "GPT-5 Mini", Provider: "OpenAI"},
-			{ID: "gpt-5-nano", Name: "GPT-5 Nano", Provider: "OpenAI"},
-			{ID: "gpt-4.1", Name: "GPT-4.1", Provider: "OpenAI"},
-			{ID: "gpt-4.1-mini", Name: "GPT-4.1 Mini", Provider: "OpenAI"},
-			{ID: "gpt-4.1-nano", Name: "GPT-4.1 Nano", Provider: "OpenAI"},
-			{ID: "o3-mini", Name: "O3 Mini", Provider: "OpenAI"},
+			{ID: "gpt-5", Name: "GPT-5", Provider: "OpenAI", Picture: "https://models.dev/logos/openai.svg"},
+			{ID: "gpt-5-mini", Name: "GPT-5 Mini", Provider: "OpenAI", Picture: "https://models.dev/logos/openai.svg"},
+			{ID: "gpt-5-nano", Name: "GPT-5 Nano", Provider: "OpenAI", Picture: "https://models.dev/logos/openai.svg"},
+			{ID: "gpt-4.1", Name: "GPT-4.1", Provider: "OpenAI", Picture: "https://models.dev/logos/openai.svg"},
+			{ID: "gpt-4.1-mini", Name: "GPT-4.1 Mini", Provider: "OpenAI", Picture: "https://models.dev/logos/openai.svg"},
+			{ID: "gpt-4.1-nano", Name: "GPT-4.1 Nano", Provider: "OpenAI", Picture: "https://models.dev/logos/openai.svg"},
+			{ID: "o3-mini", Name: "O3 Mini", Provider: "OpenAI", Picture: "https://models.dev/logos/openai.svg"},
 		},
 	}
 }
@@ -41,10 +41,10 @@ func NewGroqProvider(apiKey string) *OpenAICompatibleProvider {
 		apiKey:  apiKey,
 		baseURL: "https://api.groq.com/openai/v1",
 		models: []ModelInfo{
-			{ID: "llama-3.3-70b-versatile", Name: "Llama 3.3 70B", Provider: "Groq"},
-			{ID: "llama-3.1-8b-instant", Name: "Llama 3.1 8B", Provider: "Groq"},
-			{ID: "mixtral-8x7b-32768", Name: "Mixtral 8x7B", Provider: "Groq"},
-			{ID: "gemma2-9b-it", Name: "Gemma 2 9B", Provider: "Groq"},
+			{ID: "llama-3.3-70b-versatile", Name: "Llama 3.3 70B", Provider: "Groq", Picture: "https://models.dev/logos/groq.svg"},
+			{ID: "llama-3.1-8b-instant", Name: "Llama 3.1 8B", Provider: "Groq", Picture: "https://models.dev/logos/groq.svg"},
+			{ID: "mixtral-8x7b-32768", Name: "Mixtral 8x7B", Provider: "Groq", Picture: "https://models.dev/logos/groq.svg"},
+			{ID: "gemma2-9b-it", Name: "Gemma 2 9B", Provider: "Groq", Picture: "https://models.dev/logos/groq.svg"},
 		},
 	}
 }
@@ -56,10 +56,10 @@ func NewMistralProvider(apiKey string) *OpenAICompatibleProvider {
 		apiKey:  apiKey,
 		baseURL: "https://api.mistral.ai/v1",
 		models: []ModelInfo{
-			{ID: "mistral-large-latest", Name: "Mistral Large", Provider: "Mistral"},
-			{ID: "mistral-medium-latest", Name: "Mistral Medium", Provider: "Mistral"},
-			{ID: "mistral-small-latest", Name: "Mistral Small", Provider: "Mistral"},
-			{ID: "open-mistral-nemo", Name: "Mistral Nemo", Provider: "Mistral"},
+			{ID: "mistral-large-latest", Name: "Mistral Large", Provider: "Mistral", Picture: "https://models.dev/logos/mistral.svg"},
+			{ID: "mistral-medium-latest", Name: "Mistral Medium", Provider: "Mistral", Picture: "https://models.dev/logos/mistral.svg"},
+			{ID: "mistral-small-latest", Name: "Mistral Small", Provider: "Mistral", Picture: "https://models.dev/logos/mistral.svg"},
+			{ID: "open-mistral-nemo", Name: "Mistral Nemo", Provider: "Mistral", Picture: "https://models.dev/logos/mistral.svg"},
 		},
 	}
 }
@@ -144,13 +144,30 @@ func (p *OpenAICompatibleProvider) ListModels(ctx context.Context) ([]ModelInfo,
 		return nil, err
 	}
 
+	pictureURL := providerPicture(p.name)
 	var models []ModelInfo
 	for _, m := range resp.Models {
 		models = append(models, ModelInfo{
 			ID:       m.ID,
 			Name:     m.ID,
 			Provider: p.name,
+			Picture:  pictureURL,
 		})
 	}
 	return models, nil
+}
+
+var providerPictureMap = map[string]string{
+	"OpenAI":    "https://models.dev/logos/openai.svg",
+	"Groq":      "https://models.dev/logos/groq.svg",
+	"Mistral":   "https://models.dev/logos/mistral.svg",
+	"Ollama":    "https://models.dev/logos/llama.svg",
+	"LM Studio": "https://models.dev/logos/lmstudio.svg",
+}
+
+func providerPicture(name string) string {
+	if url, ok := providerPictureMap[name]; ok {
+		return url
+	}
+	return ""
 }

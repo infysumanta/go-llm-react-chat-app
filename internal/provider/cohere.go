@@ -21,9 +21,9 @@ func NewCohereProvider(apiKey string) *CohereProvider {
 	return &CohereProvider{
 		apiKey: apiKey,
 		models: []ModelInfo{
-			{ID: "command-r-plus", Name: "Command R+", Provider: "Cohere"},
-			{ID: "command-r", Name: "Command R", Provider: "Cohere"},
-			{ID: "command-light", Name: "Command Light", Provider: "Cohere"},
+			{ID: "command-r-plus", Name: "Command R+", Provider: "Cohere", Picture: "https://models.dev/logos/cohere.svg"},
+			{ID: "command-r", Name: "Command R", Provider: "Cohere", Picture: "https://models.dev/logos/cohere.svg"},
+			{ID: "command-light", Name: "Command Light", Provider: "Cohere", Picture: "https://models.dev/logos/cohere.svg"},
 		},
 	}
 }

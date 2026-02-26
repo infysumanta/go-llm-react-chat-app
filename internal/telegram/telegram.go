@@ -289,6 +289,24 @@ func (bm *BotManager) handleMessage(tb *telegramBot, msg *tgbotapi.Message) {
 		return
 	}
 
+	// Send initial typing indicator
+	tb.api.Send(tgbotapi.NewChatAction(chatID, tgbotapi.ChatTyping))
+
+	// Keep sending typing action while LLM is generating
+	typingDone := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-typingDone:
+				return
+			case <-ticker.C:
+				tb.api.Send(tgbotapi.NewChatAction(chatID, tgbotapi.ChatTyping))
+			}
+		}
+	}()
+
 	// Call LLM via provider
 	stream := make(chan string)
 	go func() {
@@ -299,6 +317,8 @@ func (bm *BotManager) handleMessage(tb *telegramBot, msg *tgbotapi.Message) {
 	for chunk := range stream {
 		fullResponse.WriteString(chunk)
 	}
+
+	close(typingDone) // stop typing indicator
 
 	responseText := fullResponse.String()
 	if responseText == "" {

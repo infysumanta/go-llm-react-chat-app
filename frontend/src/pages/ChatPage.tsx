@@ -1,4 +1,5 @@
 import { useChat } from "@ai-sdk/react";
+import { useQueryClient } from "@tanstack/react-query";
 import { TextStreamChatTransport } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -11,21 +12,19 @@ import Sidebar from "@/components/Sidebar";
 import { useChannels } from "@/hooks/useChannels";
 import { useConversations } from "@/hooks/useConversations";
 import { useHealthCheck } from "@/hooks/useHealthCheck";
-import type { Model } from "@/types";
+import { useModels } from "@/hooks/useModels";
+import { deleteConversation, fetchConversation } from "@/api";
 
 export default function ChatPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [selectedModel, setSelectedModel] = useState("");
-  const [models, setModels] = useState<Model[]>([]);
   const isOnline = useHealthCheck();
-  const {
-    conversations,
-    fetchConversations,
-    loadConversation,
-    deleteConversation,
-  } = useConversations();
-  const { channels } = useChannels();
+
+  const { data: models = [] } = useModels();
+  const { data: conversations = [] } = useConversations();
+  const { data: channels = [] } = useChannels();
 
   // Refs keep current values accessible inside the transport body function,
   // which is created once but called on every request.
@@ -58,19 +57,19 @@ export default function ChatPage() {
   const justCreated = useRef(false);
   const [activeChannel, setActiveChannel] = useState("web");
 
-  // Fetch available models on mount and set default
+  // Set default model when models load
   useEffect(() => {
-    fetch("/api/models")
-      .then((r) => r.json())
-      .then((data: Model[]) => {
-        setModels(data);
-        const first = data[0];
-        if (!selectedModel && first) {
-          setSelectedModel(first.id);
-        }
-      })
-      .catch(() => {});
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    const first = models[0];
+    if (!selectedModel && first) {
+      setSelectedModel(first.id);
+    }
+  }, [models, selectedModel]);
+
+  // Derive model picture for the selected model
+  const modelPicture = useMemo(
+    () => models.find((m) => m.id === selectedModel)?.picture ?? "",
+    [models, selectedModel],
+  );
 
   // Load conversation when URL param changes
   // biome-ignore lint/correctness/useExhaustiveDependencies: only re-run when id changes
@@ -80,11 +79,7 @@ export default function ChatPage() {
         justCreated.current = false;
         return;
       }
-      loadConversation(id).then((conv) => {
-        if (!conv) {
-          navigate("/", { replace: true });
-          return;
-        }
+      fetchConversation(id).then((conv) => {
         setSelectedModel(conv.model);
         setActiveChannel(conv.channel || "web");
         const sdkMessages = conv.messages.map((m) => ({
@@ -93,6 +88,8 @@ export default function ChatPage() {
           parts: [{ type: "text" as const, text: m.content }],
         }));
         setMessages(sdkMessages);
+      }).catch(() => {
+        navigate("/", { replace: true });
       });
     } else {
       setMessages([]);
@@ -104,7 +101,8 @@ export default function ChatPage() {
   // biome-ignore lint/correctness/useExhaustiveDependencies: only re-run on status/messages.length change
   useEffect(() => {
     if (status === "ready" && messages.length > 0) {
-      fetchConversations().then((convs) => {
+      queryClient.invalidateQueries({ queryKey: ["conversations"] }).then(() => {
+        const convs = queryClient.getQueryData<{ id: string; channel?: string }[]>(["conversations"]);
         if (!id && convs && convs.length > 0) {
           const newest = convs.find((c) => !c.channel || c.channel === "web");
           if (newest) {
@@ -119,11 +117,12 @@ export default function ChatPage() {
   const handleDeleteConversation = useCallback(
     async (convId: string) => {
       await deleteConversation(convId);
+      await queryClient.invalidateQueries({ queryKey: ["conversations"] });
       if (convId === id) {
         navigate("/");
       }
     },
-    [deleteConversation, id, navigate],
+    [id, navigate, queryClient],
   );
 
   const handleSend = useCallback(
@@ -164,7 +163,7 @@ export default function ChatPage() {
           {messages.length === 0 ? (
             <EmptyState onSuggestion={handleSuggestion} />
           ) : (
-            <ChatMessages messages={messages} isStreaming={isStreaming} />
+            <ChatMessages messages={messages} isStreaming={isStreaming} modelPicture={modelPicture} />
           )}
         </div>
         {activeChannel === "telegram" ? (

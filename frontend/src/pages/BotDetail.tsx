@@ -1,29 +1,15 @@
-import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
-import type { Channel, ConversationWithCount } from "@/types";
+import { useChannel, useChannelConversations } from "@/hooks/useChannels";
 
 export default function BotDetail() {
   const { channelId } = useParams<{ channelId: string }>();
   const navigate = useNavigate();
-  const [channel, setChannel] = useState<Channel | null>(null);
-  const [conversations, setConversations] = useState<ConversationWithCount[]>(
-    [],
-  );
-  const [loading, setLoading] = useState(true);
+  const { data: channel, isLoading: channelLoading } = useChannel(channelId);
+  const { data: conversations = [], isLoading: convsLoading } =
+    useChannelConversations(channelId);
 
-  useEffect(() => {
-    Promise.all([
-      fetch(`/api/channels/${channelId}`).then((r) => r.json()),
-      fetch(`/api/channels/${channelId}/conversations`).then((r) => r.json()),
-    ])
-      .then(([ch, convs]: [Channel, ConversationWithCount[]]) => {
-        setChannel(ch);
-        setConversations(convs || []);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [channelId]);
+  const loading = channelLoading || convsLoading;
 
   if (loading) {
     return (

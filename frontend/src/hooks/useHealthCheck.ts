@@ -1,26 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
-export function useHealthCheck(intervalMs = 30000): boolean | null {
-  const [isOnline, setIsOnline] = useState<boolean | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+import { checkHealth } from "@/api";
 
-  useEffect(() => {
-    const check = async () => {
-      try {
-        const res = await fetch("/api/health");
-        const data: { status: string } = await res.json();
-        setIsOnline(data.status === "ok");
-      } catch {
-        setIsOnline(false);
-      }
-    };
-
-    check();
-    intervalRef.current = setInterval(check, intervalMs);
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [intervalMs]);
-
-  return isOnline;
+export function useHealthCheck(): boolean | null {
+  const { data } = useQuery({
+    queryKey: ["health"],
+    queryFn: checkHealth,
+    refetchInterval: 30000,
+  });
+  return data ?? null;
 }

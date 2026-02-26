@@ -18,9 +18,9 @@ func NewGoogleProvider(apiKey string) *GoogleProvider {
 	return &GoogleProvider{
 		apiKey: apiKey,
 		models: []ModelInfo{
-			{ID: "gemini-2.5-flash", Name: "Gemini 2.5 Flash", Provider: "Google"},
-			{ID: "gemini-2.5-pro", Name: "Gemini 2.5 Pro", Provider: "Google"},
-			{ID: "gemini-2.0-flash", Name: "Gemini 2.0 Flash", Provider: "Google"},
+			{ID: "gemini-2.5-flash", Name: "Gemini 2.5 Flash", Provider: "Google", Picture: "https://models.dev/logos/google.svg"},
+			{ID: "gemini-2.5-pro", Name: "Gemini 2.5 Pro", Provider: "Google", Picture: "https://models.dev/logos/google.svg"},
+			{ID: "gemini-2.0-flash", Name: "Gemini 2.0 Flash", Provider: "Google", Picture: "https://models.dev/logos/google.svg"},
 		},
 	}
 }

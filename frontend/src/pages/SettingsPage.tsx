@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import {
@@ -10,15 +10,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useChannels } from "@/hooks/useChannels";
+import {
+  useChannels,
+  useCreateChannel,
+  useUpdateChannel,
+  useDeleteChannel,
+} from "@/hooks/useChannels";
+import { useModels } from "@/hooks/useModels";
 import { groupModelsByProvider } from "@/lib/models";
-import type { Channel, Model } from "@/types";
+import type { Channel } from "@/types";
 
 export default function SettingsPage() {
   const navigate = useNavigate();
-  const { channels, createChannel, updateChannel, deleteChannel } =
-    useChannels();
-  const [models, setModels] = useState<Model[]>([]);
+  const { data: channels = [] } = useChannels();
+  const { data: models = [] } = useModels();
+  const createChannelMut = useCreateChannel();
+  const updateChannelMut = useUpdateChannel();
+  const deleteChannelMut = useDeleteChannel();
+
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState("");
@@ -30,18 +39,10 @@ export default function SettingsPage() {
   const [formModel, setFormModel] = useState("");
   const [formEnabled, setFormEnabled] = useState(true);
 
-  useEffect(() => {
-    fetch("/api/models")
-      .then((r) => r.json())
-      .then((data: Model[]) => {
-        setModels(data);
-        const first = data[0];
-        if (first && !formModel) {
-          setFormModel(first.id);
-        }
-      })
-      .catch(() => {});
-  }, [formModel]);
+  // Set default model when models load
+  if (models.length > 0 && !formModel) {
+    setFormModel(models[0].id);
+  }
 
   const groups = groupModelsByProvider(models);
 
@@ -83,11 +84,14 @@ export default function SettingsPage() {
     setError("");
     try {
       if (editingId) {
-        await updateChannel(editingId, {
-          name: formName,
-          systemPrompt: formPrompt,
-          model: formModel,
-          enabled: formEnabled,
+        await updateChannelMut.mutateAsync({
+          id: editingId,
+          payload: {
+            name: formName,
+            systemPrompt: formPrompt,
+            model: formModel,
+            enabled: formEnabled,
+          },
         });
       } else {
         if (!formToken) {
@@ -95,7 +99,7 @@ export default function SettingsPage() {
           setSaving(false);
           return;
         }
-        await createChannel({
+        await createChannelMut.mutateAsync({
           name: formName,
           botToken: formToken,
           systemPrompt: formPrompt,
@@ -114,7 +118,7 @@ export default function SettingsPage() {
     if (!confirm("Delete this bot? It will stop responding immediately."))
       return;
     try {
-      await deleteChannel(id);
+      await deleteChannelMut.mutateAsync(id);
     } catch {
       setError("Failed to delete bot");
     }

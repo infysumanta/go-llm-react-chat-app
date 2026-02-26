@@ -18,9 +18,9 @@ func NewAnthropicProvider(apiKey string) *AnthropicProvider {
 	return &AnthropicProvider{
 		apiKey: apiKey,
 		models: []ModelInfo{
-			{ID: "claude-opus-4-20250514", Name: "Claude Opus 4", Provider: "Anthropic"},
-			{ID: "claude-sonnet-4-20250514", Name: "Claude Sonnet 4", Provider: "Anthropic"},
-			{ID: "claude-haiku-3-5-20241022", Name: "Claude 3.5 Haiku", Provider: "Anthropic"},
+			{ID: "claude-opus-4-20250514", Name: "Claude Opus 4", Provider: "Anthropic", Picture: "https://models.dev/logos/anthropic.svg"},
+			{ID: "claude-sonnet-4-20250514", Name: "Claude Sonnet 4", Provider: "Anthropic", Picture: "https://models.dev/logos/anthropic.svg"},
+			{ID: "claude-haiku-3-5-20241022", Name: "Claude 3.5 Haiku", Provider: "Anthropic", Picture: "https://models.dev/logos/anthropic.svg"},
 		},
 	}
 }

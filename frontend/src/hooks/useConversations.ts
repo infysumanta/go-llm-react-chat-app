@@ -1,75 +1,43 @@
-import { useCallback, useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import type { Conversation, ConversationWithCount } from "@/types";
+import {
+  createConversation,
+  deleteConversation,
+  fetchConversation,
+  fetchConversations,
+} from "@/api";
 
 export function useConversations() {
-  const [conversations, setConversations] = useState<ConversationWithCount[]>(
-    [],
-  );
-  const [loading, setLoading] = useState(true);
+  return useQuery({
+    queryKey: ["conversations"],
+    queryFn: fetchConversations,
+  });
+}
 
-  const fetchConversations = useCallback(async () => {
-    try {
-      const res = await fetch("/api/conversations");
-      const data: ConversationWithCount[] = await res.json();
-      setConversations(data);
-      return data;
-    } catch {
-      return [];
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+export function useConversation(id: string | undefined) {
+  return useQuery({
+    queryKey: ["conversations", id],
+    queryFn: () => fetchConversation(id!),
+    enabled: !!id,
+  });
+}
 
-  useEffect(() => {
-    fetchConversations();
-  }, [fetchConversations]);
-
-  const createConversation = useCallback(
-    async (model: string) => {
-      try {
-        const res = await fetch("/api/conversations", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ model }),
-        });
-        const conv: Conversation = await res.json();
-        await fetchConversations();
-        return conv;
-      } catch {
-        return null;
-      }
+export function useCreateConversation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (model: string) => createConversation(model),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
     },
-    [fetchConversations],
-  );
+  });
+}
 
-  const loadConversation = useCallback(async (id: string) => {
-    try {
-      const res = await fetch(`/api/conversations/${id}`);
-      return (await res.json()) as Conversation;
-    } catch {
-      return null;
-    }
-  }, []);
-
-  const deleteConversation = useCallback(
-    async (id: string) => {
-      try {
-        await fetch(`/api/conversations/${id}`, { method: "DELETE" });
-        await fetchConversations();
-      } catch {
-        // silently fail
-      }
+export function useDeleteConversation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteConversation(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
     },
-    [fetchConversations],
-  );
-
-  return {
-    conversations,
-    loading,
-    fetchConversations,
-    createConversation,
-    loadConversation,
-    deleteConversation,
-  };
+  });
 }

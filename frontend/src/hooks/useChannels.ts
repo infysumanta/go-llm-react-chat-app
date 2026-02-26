@@ -1,81 +1,68 @@
-import { useCallback, useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import type {
-  Channel,
-  CreateChannelPayload,
-  UpdateChannelPayload,
-} from "@/types";
+import {
+  createChannel,
+  deleteChannel,
+  fetchChannelConversations,
+  fetchChannel,
+  fetchChannels,
+  updateChannel,
+} from "@/api";
+import type { CreateChannelPayload, UpdateChannelPayload } from "@/types";
 
 export function useChannels() {
-  const [channels, setChannels] = useState<Channel[]>([]);
-  const [loading, setLoading] = useState(true);
+  return useQuery({
+    queryKey: ["channels"],
+    queryFn: fetchChannels,
+  });
+}
 
-  const fetchChannels = useCallback(async () => {
-    try {
-      const res = await fetch("/api/channels");
-      const data: Channel[] = await res.json();
-      setChannels(data);
-    } catch {
-      // silently fail
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+export function useChannel(id: string | undefined) {
+  return useQuery({
+    queryKey: ["channels", id],
+    queryFn: () => fetchChannel(id!),
+    enabled: !!id,
+  });
+}
 
-  useEffect(() => {
-    fetchChannels();
-  }, [fetchChannels]);
+export function useChannelConversations(id: string | undefined) {
+  return useQuery({
+    queryKey: ["channels", id, "conversations"],
+    queryFn: () => fetchChannelConversations(id!),
+    enabled: !!id,
+  });
+}
 
-  const createChannel = useCallback(
-    async (payload: CreateChannelPayload) => {
-      const res = await fetch("/api/channels", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text);
-      }
-      const channel: Channel = await res.json();
-      await fetchChannels();
-      return channel;
+export function useCreateChannel() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CreateChannelPayload) => createChannel(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["channels"] });
     },
-    [fetchChannels],
-  );
+  });
+}
 
-  const updateChannel = useCallback(
-    async (id: string, updates: UpdateChannelPayload) => {
-      const res = await fetch(`/api/channels/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updates),
-      });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text);
-      }
-      const channel: Channel = await res.json();
-      await fetchChannels();
-      return channel;
+export function useUpdateChannel() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: { id: string; payload: UpdateChannelPayload }) =>
+      updateChannel(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["channels"] });
     },
-    [fetchChannels],
-  );
+  });
+}
 
-  const deleteChannel = useCallback(
-    async (id: string) => {
-      await fetch(`/api/channels/${id}`, { method: "DELETE" });
-      await fetchChannels();
+export function useDeleteChannel() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteChannel(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["channels"] });
     },
-    [fetchChannels],
-  );
-
-  return {
-    channels,
-    loading,
-    fetchChannels,
-    createChannel,
-    updateChannel,
-    deleteChannel,
-  };
+  });
 }

@@ -13,6 +13,7 @@ type ModelInfo struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`
 	Provider string `json:"provider"`
+	Picture  string `json:"picture"`
 }
 
 // Provider is the interface every LLM backend must implement.
