@@ -19,10 +19,11 @@ type BotManager struct {
 }
 
 type TelegramBot struct {
-	channel Channel
-	api     *tgbotapi.BotAPI
-	stop    chan struct{}
-	done    chan struct{}
+	channel    Channel
+	api        *tgbotapi.BotAPI
+	stop       chan struct{}
+	done       chan struct{}
+	pendingNew sync.Map // chat IDs that requested /new
 }
 
 func NewBotManager(db *sql.DB) *BotManager {
@@ -117,6 +118,17 @@ func (bm *BotManager) RestartBot(channel Channel) {
 func (bm *BotManager) runBot(tb *TelegramBot) {
 	defer close(tb.done)
 
+	// Register bot commands with Telegram
+	commands := tgbotapi.NewSetMyCommands(
+		tgbotapi.BotCommand{Command: "new", Description: "Start a new conversation"},
+		tgbotapi.BotCommand{Command: "clear", Description: "Clear current conversation history"},
+		tgbotapi.BotCommand{Command: "model", Description: "Show the current AI model"},
+		tgbotapi.BotCommand{Command: "help", Description: "Show available commands"},
+	)
+	if _, err := tb.api.Request(commands); err != nil {
+		log.Printf("BotManager: failed to set commands for @%s: %v", tb.api.Self.UserName, err)
+	}
+
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 30
 
@@ -139,21 +151,73 @@ func (bm *BotManager) runBot(tb *TelegramBot) {
 	}
 }
 
-func (bm *BotManager) handleMessage(tb *TelegramBot, msg *tgbotapi.Message) {
+func (bm *BotManager) handleCommand(tb *TelegramBot, msg *tgbotapi.Message) {
 	chatID := msg.Chat.ID
 
-	// Handle commands
-	if msg.IsCommand() {
-		switch msg.Command() {
-		case "start":
-			reply := tgbotapi.NewMessage(chatID, fmt.Sprintf("Hello! I'm %s. Send me a message to start chatting.", tb.channel.Name))
-			tb.api.Send(reply)
-			return
-		case "new":
-			reply := tgbotapi.NewMessage(chatID, "Starting a new conversation. Send me a message!")
+	switch msg.Command() {
+	case "start":
+		text := fmt.Sprintf(
+			"Hello! I'm *%s*.\n\n"+
+				"Send me any message and I'll respond using AI.\n\n"+
+				"*Commands:*\n"+
+				"/new - Start a new conversation\n"+
+				"/clear - Clear current conversation history\n"+
+				"/model - Show the current AI model\n"+
+				"/help - Show this help message",
+			tb.channel.Name,
+		)
+		reply := tgbotapi.NewMessage(chatID, text)
+		reply.ParseMode = tgbotapi.ModeMarkdown
+		tb.api.Send(reply)
+
+	case "new":
+		tb.pendingNew.Store(chatID, true)
+		reply := tgbotapi.NewMessage(chatID, "New conversation started. Send me a message!")
+		tb.api.Send(reply)
+
+	case "clear":
+		var convID string
+		err := bm.db.QueryRow(
+			"SELECT id FROM conversations WHERE channel_id = ? AND telegram_chat_id = ? ORDER BY updated_at DESC LIMIT 1",
+			tb.channel.ID, chatID,
+		).Scan(&convID)
+		if err != nil {
+			reply := tgbotapi.NewMessage(chatID, "No conversation to clear. Send a message to start one!")
 			tb.api.Send(reply)
 			return
 		}
+		bm.db.Exec("DELETE FROM messages WHERE conversation_id = ?", convID)
+		reply := tgbotapi.NewMessage(chatID, "Conversation history cleared.")
+		tb.api.Send(reply)
+
+	case "model":
+		text := fmt.Sprintf("Current model: *%s*", tb.channel.Model)
+		reply := tgbotapi.NewMessage(chatID, text)
+		reply.ParseMode = tgbotapi.ModeMarkdown
+		tb.api.Send(reply)
+
+	case "help":
+		text := "*Available commands:*\n\n" +
+			"/new - Start a new conversation\n" +
+			"/clear - Clear current conversation history\n" +
+			"/model - Show the current AI model\n" +
+			"/help - Show this help message"
+		reply := tgbotapi.NewMessage(chatID, text)
+		reply.ParseMode = tgbotapi.ModeMarkdown
+		tb.api.Send(reply)
+
+	default:
+		reply := tgbotapi.NewMessage(chatID, "Unknown command. Type /help to see available commands.")
+		tb.api.Send(reply)
+	}
+}
+
+func (bm *BotManager) handleMessage(tb *TelegramBot, msg *tgbotapi.Message) {
+	chatID := msg.Chat.ID
+
+	if msg.IsCommand() {
+		bm.handleCommand(tb, msg)
+		return
 	}
 
 	text := msg.Text
@@ -161,8 +225,14 @@ func (bm *BotManager) handleMessage(tb *TelegramBot, msg *tgbotapi.Message) {
 		return
 	}
 
+	// Check if user requested a new conversation via /new
+	forceNew := false
+	if _, ok := tb.pendingNew.LoadAndDelete(chatID); ok {
+		forceNew = true
+	}
+
 	// Find or create conversation for this (channel_id, telegram_chat_id)
-	convID, err := bm.findOrCreateConversation(tb, chatID, text)
+	convID, err := bm.findOrCreateConversation(tb, chatID, text, forceNew)
 	if err != nil {
 		log.Printf("BotManager: failed to find/create conversation: %v", err)
 		reply := tgbotapi.NewMessage(chatID, "Sorry, something went wrong. Please try again.")
@@ -220,31 +290,33 @@ func (bm *BotManager) handleMessage(tb *TelegramBot, msg *tgbotapi.Message) {
 	bm.sendTelegramResponse(tb, chatID, responseText)
 }
 
-func (bm *BotManager) findOrCreateConversation(tb *TelegramBot, chatID int64, firstMsg string) (string, error) {
-	var convID string
-	err := bm.db.QueryRow(
-		"SELECT id FROM conversations WHERE channel_id = ? AND telegram_chat_id = ? ORDER BY updated_at DESC LIMIT 1",
-		tb.channel.ID, chatID,
-	).Scan(&convID)
-
-	if err == sql.ErrNoRows {
-		// Create new conversation
-		convID = uuid.New().String()
-		title := firstMsg
-		if len(title) > 50 {
-			title = title[:50] + "..."
+func (bm *BotManager) findOrCreateConversation(tb *TelegramBot, chatID int64, firstMsg string, forceNew bool) (string, error) {
+	if !forceNew {
+		var convID string
+		err := bm.db.QueryRow(
+			"SELECT id FROM conversations WHERE channel_id = ? AND telegram_chat_id = ? ORDER BY updated_at DESC LIMIT 1",
+			tb.channel.ID, chatID,
+		).Scan(&convID)
+		if err == nil {
+			return convID, nil
 		}
-		_, err = bm.db.Exec(
-			"INSERT INTO conversations (id, title, model, channel, channel_id, telegram_chat_id, created_at, updated_at) VALUES (?, ?, ?, 'telegram', ?, ?, ?, ?)",
-			convID, title, tb.channel.Model, tb.channel.ID, chatID, time.Now(), time.Now(),
-		)
-		if err != nil {
-			return "", fmt.Errorf("failed to create conversation: %w", err)
+		if err != sql.ErrNoRows {
+			return "", err
 		}
-		return convID, nil
 	}
+
+	// Create new conversation
+	convID := uuid.New().String()
+	title := firstMsg
+	if len(title) > 50 {
+		title = title[:50] + "..."
+	}
+	_, err := bm.db.Exec(
+		"INSERT INTO conversations (id, title, model, channel, channel_id, telegram_chat_id, created_at, updated_at) VALUES (?, ?, ?, 'telegram', ?, ?, ?, ?)",
+		convID, title, tb.channel.Model, tb.channel.ID, chatID, time.Now(), time.Now(),
+	)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to create conversation: %w", err)
 	}
 	return convID, nil
 }
