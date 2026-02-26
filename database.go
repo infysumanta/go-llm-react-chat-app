@@ -61,7 +61,34 @@ func migrate(db *sql.DB) error {
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages(conversation_id);
+
+	CREATE TABLE IF NOT EXISTS channels (
+		id            TEXT PRIMARY KEY,
+		name          TEXT NOT NULL,
+		type          TEXT NOT NULL DEFAULT 'telegram',
+		bot_token     TEXT NOT NULL,
+		system_prompt TEXT NOT NULL DEFAULT '',
+		model         TEXT NOT NULL DEFAULT 'gpt-5-nano',
+		enabled       INTEGER NOT NULL DEFAULT 1,
+		bot_username  TEXT DEFAULT '',
+		created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
 	`
-	_, err := db.Exec(schema)
-	return err
+	if _, err := db.Exec(schema); err != nil {
+		return err
+	}
+
+	// Add columns to existing tables (ignore errors for already-existing columns)
+	alterStmts := []string{
+		"ALTER TABLE conversations ADD COLUMN channel TEXT NOT NULL DEFAULT 'web'",
+		"ALTER TABLE conversations ADD COLUMN channel_id TEXT DEFAULT NULL",
+		"ALTER TABLE conversations ADD COLUMN telegram_chat_id INTEGER DEFAULT NULL",
+		"ALTER TABLE messages ADD COLUMN channel TEXT NOT NULL DEFAULT 'web'",
+	}
+	for _, stmt := range alterStmts {
+		db.Exec(stmt) // ignore "duplicate column" errors
+	}
+
+	return nil
 }

@@ -37,7 +37,7 @@ func (h *Handlers) ListModels(w http.ResponseWriter, r *http.Request) {
 // GET /api/conversations
 func (h *Handlers) ListConversations(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.db.Query(
-		"SELECT id, title, model, created_at, updated_at FROM conversations ORDER BY updated_at DESC",
+		"SELECT id, title, model, channel, channel_id, created_at, updated_at FROM conversations ORDER BY updated_at DESC",
 	)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -48,7 +48,7 @@ func (h *Handlers) ListConversations(w http.ResponseWriter, r *http.Request) {
 	conversations := []Conversation{}
 	for rows.Next() {
 		var c Conversation
-		if err := rows.Scan(&c.ID, &c.Title, &c.Model, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.Title, &c.Model, &c.Channel, &c.ChannelID, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -81,7 +81,7 @@ func (h *Handlers) CreateConversation(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 
 	_, err := h.db.Exec(
-		"INSERT INTO conversations (id, title, model, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+		"INSERT INTO conversations (id, title, model, channel, created_at, updated_at) VALUES (?, ?, ?, 'web', ?, ?)",
 		id, req.Title, req.Model, now, now,
 	)
 	if err != nil {
@@ -93,6 +93,7 @@ func (h *Handlers) CreateConversation(w http.ResponseWriter, r *http.Request) {
 		ID:        id,
 		Title:     req.Title,
 		Model:     req.Model,
+		Channel:   "web",
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
@@ -108,8 +109,8 @@ func (h *Handlers) GetConversation(w http.ResponseWriter, r *http.Request) {
 
 	var conv Conversation
 	err := h.db.QueryRow(
-		"SELECT id, title, model, created_at, updated_at FROM conversations WHERE id = ?", id,
-	).Scan(&conv.ID, &conv.Title, &conv.Model, &conv.CreatedAt, &conv.UpdatedAt)
+		"SELECT id, title, model, channel, channel_id, created_at, updated_at FROM conversations WHERE id = ?", id,
+	).Scan(&conv.ID, &conv.Title, &conv.Model, &conv.Channel, &conv.ChannelID, &conv.CreatedAt, &conv.UpdatedAt)
 	if err == sql.ErrNoRows {
 		http.Error(w, "conversation not found", http.StatusNotFound)
 		return
@@ -120,7 +121,7 @@ func (h *Handlers) GetConversation(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := h.db.Query(
-		"SELECT id, conversation_id, role, content, model, created_at FROM messages WHERE conversation_id = ? ORDER BY created_at ASC", id,
+		"SELECT id, conversation_id, role, content, model, channel, created_at FROM messages WHERE conversation_id = ? ORDER BY created_at ASC", id,
 	)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -132,7 +133,7 @@ func (h *Handlers) GetConversation(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var m Message
 		var model sql.NullString
-		if err := rows.Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &model, &m.CreatedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &model, &m.Channel, &m.CreatedAt); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -228,7 +229,7 @@ func (h *Handlers) Chat(w http.ResponseWriter, r *http.Request) {
 			title = "New Chat"
 		}
 		_, err := h.db.Exec(
-			"INSERT INTO conversations (id, title, model, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+			"INSERT INTO conversations (id, title, model, channel, created_at, updated_at) VALUES (?, ?, ?, 'web', ?, ?)",
 			convID, title, model, time.Now(), time.Now(),
 		)
 		if err != nil {
@@ -241,7 +242,7 @@ func (h *Handlers) Chat(w http.ResponseWriter, r *http.Request) {
 	if lastUserText != "" {
 		userMsgID := uuid.New().String()
 		_, err := h.db.Exec(
-			"INSERT INTO messages (id, conversation_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)",
+			"INSERT INTO messages (id, conversation_id, role, content, channel, created_at) VALUES (?, ?, ?, ?, 'web', ?)",
 			userMsgID, convID, "user", lastUserText, time.Now(),
 		)
 		if err != nil {
@@ -281,7 +282,7 @@ func (h *Handlers) Chat(w http.ResponseWriter, r *http.Request) {
 	if fullResponse.Len() > 0 {
 		assistantMsgID := uuid.New().String()
 		h.db.Exec(
-			"INSERT INTO messages (id, conversation_id, role, content, model, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+			"INSERT INTO messages (id, conversation_id, role, content, model, channel, created_at) VALUES (?, ?, ?, ?, ?, 'web', ?)",
 			assistantMsgID, convID, "assistant", fullResponse.String(), model, time.Now(),
 		)
 	}

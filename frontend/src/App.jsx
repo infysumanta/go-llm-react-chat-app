@@ -6,8 +6,10 @@ import ChatHeader from "./components/ChatHeader";
 import ChatMessages from "./components/ChatMessages";
 import ChatInput from "./components/ChatInput";
 import EmptyState from "./components/EmptyState";
+import Settings from "./components/Settings";
 import { useHealthCheck } from "./hooks/useHealthCheck";
 import { useConversations } from "./hooks/useConversations";
+import { useChannels } from "./hooks/useChannels";
 
 const DEFAULT_MODEL = "gpt-5-nano";
 
@@ -15,6 +17,7 @@ function App() {
   const [activeConvId, setActiveConvId] = useState(null);
   const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL);
   const [models, setModels] = useState([]);
+  const [showSettings, setShowSettings] = useState(false);
   const isOnline = useHealthCheck();
   const {
     conversations,
@@ -22,6 +25,12 @@ function App() {
     loadConversation,
     deleteConversation,
   } = useConversations();
+  const {
+    channels,
+    createChannel,
+    updateChannel,
+    deleteChannel,
+  } = useChannels();
 
   const { messages, sendMessage, status, stop, setMessages } = useChat({
     transport: new TextStreamChatTransport({
@@ -109,6 +118,7 @@ function App() {
         onSelect={handleSelectConversation}
         onNew={handleNewChat}
         onDelete={handleDeleteConversation}
+        channels={channels}
       />
       <main className="flex-1 flex flex-col min-w-0">
         <ChatHeader
@@ -116,6 +126,7 @@ function App() {
           selectedModel={selectedModel}
           onModelChange={setSelectedModel}
           isOnline={isOnline}
+          onOpenSettings={() => setShowSettings(true)}
         />
         <div className="flex-1 overflow-y-auto">
           {messages.length === 0 ? (
@@ -130,6 +141,16 @@ function App() {
           onStop={stop}
         />
       </main>
+      {showSettings && (
+        <Settings
+          channels={channels}
+          models={models}
+          onClose={() => setShowSettings(false)}
+          onCreate={createChannel}
+          onUpdate={updateChannel}
+          onDelete={deleteChannel}
+        />
+      )}
     </div>
   );
 }

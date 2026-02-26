@@ -24,6 +24,12 @@ func main() {
 
 	h := NewHandlers(db)
 
+	// Start Telegram bot manager
+	botManager := NewBotManager(db)
+	go botManager.LoadAndStartAll()
+
+	ch := NewChannelHandlers(db, botManager)
+
 	mux := http.NewServeMux()
 
 	// API routes
@@ -34,6 +40,13 @@ func main() {
 	mux.HandleFunc("GET /api/conversations/{id}", h.GetConversation)
 	mux.HandleFunc("DELETE /api/conversations/{id}", h.DeleteConversation)
 	mux.HandleFunc("POST /api/chat", h.Chat)
+
+	// Channel management routes
+	mux.HandleFunc("GET /api/channels", ch.ListChannels)
+	mux.HandleFunc("POST /api/channels", ch.CreateChannel)
+	mux.HandleFunc("GET /api/channels/{id}", ch.GetChannel)
+	mux.HandleFunc("PUT /api/channels/{id}", ch.UpdateChannel)
+	mux.HandleFunc("DELETE /api/channels/{id}", ch.DeleteChannel)
 
 	// Static files
 	distFS, err := fs.Sub(staticFiles, "dist")

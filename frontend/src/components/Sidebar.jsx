@@ -4,7 +4,13 @@ export default function Sidebar({
   onSelect,
   onNew,
   onDelete,
+  channels = [],
 }) {
+  // Build a map of channel ID → channel name for badge display
+  const channelMap = {};
+  for (const ch of channels) {
+    channelMap[ch.id] = ch.name;
+  }
   return (
     <aside className="hidden md:flex w-64 flex-col bg-gray-900 border-r border-gray-800">
       <div className="p-4 border-b border-gray-800">
@@ -42,7 +48,14 @@ export default function Sidebar({
                 : "text-gray-400 hover:bg-gray-800/50 hover:text-gray-300"
             }`}
           >
-            <span className="flex-1 truncate">{conv.title}</span>
+            <span className="flex-1 truncate flex items-center gap-1.5">
+              {conv.channel === "telegram" && (
+                <span className="inline-flex shrink-0 items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-500/15 text-blue-400 border border-blue-500/20">
+                  TG{conv.channelId && channelMap[conv.channelId] ? `: ${channelMap[conv.channelId]}` : ""}
+                </span>
+              )}
+              <span className="truncate">{conv.title}</span>
+            </span>
             <button
               onClick={(e) => {
                 e.stopPropagation();
