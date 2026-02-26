@@ -9,7 +9,7 @@ import EmptyState from "./components/EmptyState";
 import { useHealthCheck } from "./hooks/useHealthCheck";
 import { useConversations } from "./hooks/useConversations";
 
-const DEFAULT_MODEL = "gpt-4o-mini";
+const DEFAULT_MODEL = "gpt-5-nano";
 
 function App() {
   const [activeConvId, setActiveConvId] = useState(null);

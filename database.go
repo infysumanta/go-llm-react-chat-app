@@ -38,7 +38,7 @@ func migrate(db *sql.DB) error {
 	CREATE TABLE IF NOT EXISTS conversations (
 		id         TEXT PRIMARY KEY,
 		title      TEXT NOT NULL DEFAULT 'New Chat',
-		model      TEXT NOT NULL DEFAULT 'gpt-4o-mini',
+		model      TEXT NOT NULL DEFAULT 'gpt-5-nano',
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);

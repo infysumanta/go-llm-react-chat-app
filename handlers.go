@@ -68,13 +68,13 @@ func (h *Handlers) CreateConversation(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		// Allow empty body — use defaults
 		req.Title = "New Chat"
-		req.Model = "gpt-4o-mini"
+		req.Model = "gpt-5-nano"
 	}
 	if req.Title == "" {
 		req.Title = "New Chat"
 	}
 	if req.Model == "" || !IsValidModel(req.Model) {
-		req.Model = "gpt-4o-mini"
+		req.Model = "gpt-5-nano"
 	}
 
 	id := uuid.New().String()
@@ -199,7 +199,7 @@ func (h *Handlers) Chat(w http.ResponseWriter, r *http.Request) {
 
 	model := req.Model
 	if model == "" || !IsValidModel(model) {
-		model = "gpt-4o-mini"
+		model = "gpt-5-nano"
 	}
 
 	// Extract the last user message text

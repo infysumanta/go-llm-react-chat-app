@@ -26,15 +26,9 @@ type ModelInfo struct {
 }
 
 var AvailableModels = []ModelInfo{
-	{ID: "gpt-4o", Name: "GPT-4o"},
-	{ID: "gpt-4o-mini", Name: "GPT-4o Mini"},
-	{ID: "gpt-4.1", Name: "GPT-4.1"},
-	{ID: "gpt-4.1-mini", Name: "GPT-4.1 Mini"},
-	{ID: "gpt-4.1-nano", Name: "GPT-4.1 Nano"},
-	{ID: "gpt-3.5-turbo", Name: "GPT-3.5 Turbo"},
-	{ID: "o3", Name: "o3"},
-	{ID: "o3-mini", Name: "o3 Mini"},
-	{ID: "o4-mini", Name: "o4 Mini"},
+	{ID: "gpt-5", Name: "GPT-5"},
+	{ID: "gpt-5-mini", Name: "GPT-5 Mini"},
+	{ID: "gpt-5-nano", Name: "GPT-5 Nano"},
 }
 
 func IsValidModel(model string) bool {
