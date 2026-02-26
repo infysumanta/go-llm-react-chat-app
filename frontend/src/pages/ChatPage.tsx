@@ -27,13 +27,25 @@ export default function ChatPage() {
   } = useConversations();
   const { channels } = useChannels();
 
-  // Transport is created once — dynamic values (model, conversationId)
-  // are passed via sendMessage's body option instead.
+  // Refs keep current values accessible inside the transport body function,
+  // which is created once but called on every request.
+  const selectedModelRef = useRef(selectedModel);
+  const idRef = useRef(id);
+  useEffect(() => { selectedModelRef.current = selectedModel; }, [selectedModel]);
+  useEffect(() => { idRef.current = id; }, [id]);
+
   const transport = useMemo(
     () =>
       new TextStreamChatTransport({
         api: "/api/chat",
         headers: { "Content-Type": "application/json" },
+        body: async () => {
+          console.log("[transport body] model:", selectedModelRef.current, "conversationId:", idRef.current);
+          return {
+            model: selectedModelRef.current,
+            conversationId: idRef.current || null,
+          };
+        },
       }),
     [],
   );
@@ -116,13 +128,10 @@ export default function ChatPage() {
 
   const handleSend = useCallback(
     (text: string) => {
-      console.log("[ChatPage] Sending message with model:", selectedModel, "conversationId:", id || null);
-      sendMessage(
-        { text },
-        { body: { model: selectedModel, conversationId: id || null } },
-      );
+      console.log("[ChatPage] handleSend — selectedModel:", selectedModel, "ref:", selectedModelRef.current);
+      sendMessage({ text });
     },
-    [sendMessage, selectedModel, id],
+    [sendMessage, selectedModel],
   );
 
   const handleSuggestion = useCallback(
