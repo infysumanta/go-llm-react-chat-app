@@ -2,9 +2,9 @@ package main
 
 import (
 	"embed"
-	"encoding/json"
 	"fmt"
 	"io/fs"
+	"log"
 	"net/http"
 
 	"github.com/joho/godotenv"
@@ -13,51 +13,35 @@ import (
 //go:embed dist/*
 var staticFiles embed.FS
 
-type ChatRequest struct {
-	Message string `json:"message"`
-}
-
 func main() {
 	godotenv.Load()
 
+	db, err := InitDB()
+	if err != nil {
+		log.Fatal("Failed to initialize database:", err)
+	}
+	defer db.Close()
+
+	h := NewHandlers(db)
+
+	mux := http.NewServeMux()
+
+	// API routes
+	mux.HandleFunc("GET /api/health", h.HealthCheck)
+	mux.HandleFunc("GET /api/models", h.ListModels)
+	mux.HandleFunc("GET /api/conversations", h.ListConversations)
+	mux.HandleFunc("POST /api/conversations", h.CreateConversation)
+	mux.HandleFunc("GET /api/conversations/{id}", h.GetConversation)
+	mux.HandleFunc("DELETE /api/conversations/{id}", h.DeleteConversation)
+	mux.HandleFunc("POST /api/chat", h.Chat)
+
+	// Static files
 	distFS, err := fs.Sub(staticFiles, "dist")
 	if err != nil {
-		panic(err)
+		log.Fatal("Failed to load static files:", err)
 	}
-
-	http.Handle("/", http.FileServer(http.FS(distFS)))
-
-	http.HandleFunc("/api/chat", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
-		var req ChatRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Invalid request", http.StatusBadRequest)
-			return
-		}
-
-		w.Header().Set("Content-Type", "text/plain")
-		w.Header().Set("Transfer-Encoding", "chunked")
-
-		flusher, ok := w.(http.Flusher)
-		if !ok {
-			http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
-			return
-		}
-
-		stream := make(chan string)
-
-		go StreamChat(req.Message, stream)
-
-		for chunk := range stream {
-			w.Write([]byte(chunk))
-			flusher.Flush()
-		}
-	})
+	mux.Handle("/", http.FileServer(http.FS(distFS)))
 
 	fmt.Println("Server running on http://localhost:8080")
-	http.ListenAndServe(":8080", nil)
+	log.Fatal(http.ListenAndServe(":8080", mux))
 }

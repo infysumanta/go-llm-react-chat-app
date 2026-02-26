@@ -32,3 +32,8 @@ go.work.sum
 # .vscode/
 dist
 node_modules
+
+# SQLite database files
+*.db
+*.db-wal
+*.db-shm
