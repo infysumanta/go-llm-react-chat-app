@@ -22,6 +22,7 @@ type TelegramBot struct {
 	channel Channel
 	api     *tgbotapi.BotAPI
 	stop    chan struct{}
+	done    chan struct{}
 }
 
 func NewBotManager(db *sql.DB) *BotManager {
@@ -56,13 +57,17 @@ func (bm *BotManager) LoadAndStartAll() {
 
 // StartBot starts a single Telegram bot for the given channel.
 func (bm *BotManager) StartBot(channel Channel) {
+	// Stop existing bot if already running and wait for it to finish
 	bm.mu.Lock()
-	defer bm.mu.Unlock()
-
-	// Stop existing bot if already running
-	if existing, ok := bm.bots[channel.ID]; ok {
+	existing, hadExisting := bm.bots[channel.ID]
+	if hadExisting {
 		close(existing.stop)
 		delete(bm.bots, channel.ID)
+	}
+	bm.mu.Unlock()
+
+	if hadExisting {
+		<-existing.done // wait for old goroutine to fully stop
 	}
 
 	bot, err := tgbotapi.NewBotAPI(channel.BotToken)
@@ -75,22 +80,30 @@ func (bm *BotManager) StartBot(channel Channel) {
 		channel: channel,
 		api:     bot,
 		stop:    make(chan struct{}),
+		done:    make(chan struct{}),
 	}
+
+	bm.mu.Lock()
 	bm.bots[channel.ID] = tb
+	bm.mu.Unlock()
 
 	log.Printf("BotManager: started bot @%s for channel %q", bot.Self.UserName, channel.Name)
 
 	go bm.runBot(tb)
 }
 
-// StopBot stops a running bot by channel ID.
+// StopBot stops a running bot by channel ID and waits for it to finish.
 func (bm *BotManager) StopBot(channelID string) {
 	bm.mu.Lock()
-	defer bm.mu.Unlock()
-
-	if tb, ok := bm.bots[channelID]; ok {
+	tb, ok := bm.bots[channelID]
+	if ok {
 		close(tb.stop)
 		delete(bm.bots, channelID)
+	}
+	bm.mu.Unlock()
+
+	if ok {
+		<-tb.done // wait for goroutine to fully stop
 		log.Printf("BotManager: stopped bot for channel %s", channelID)
 	}
 }
@@ -102,6 +115,8 @@ func (bm *BotManager) RestartBot(channel Channel) {
 }
 
 func (bm *BotManager) runBot(tb *TelegramBot) {
+	defer close(tb.done)
+
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 30
 
