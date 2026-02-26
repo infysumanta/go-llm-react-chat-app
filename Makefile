@@ -1,6 +1,7 @@
-.PHONY: all build run dev clean deps frontend backend
+.PHONY: all build run dev clean deps frontend backend docker docker-run compose compose-down
 
 BINARY := llm-chat
+IMAGE := llm-chat
 
 all: build
 
@@ -28,6 +29,22 @@ run: build
 # Dev mode: run frontend dev server
 dev:
 	cd frontend && npm run dev
+
+# Build Docker image
+docker:
+	docker build -t $(IMAGE) .
+
+# Run Docker container
+docker-run:
+	docker run --rm -p 8080:8080 -e OPENAI_API_KEY -v llm-chat-data:/app/data $(IMAGE)
+
+# Start with Docker Compose
+compose:
+	docker compose up --build -d
+
+# Stop Docker Compose
+compose-down:
+	docker compose down
 
 # Clean build artifacts
 clean:

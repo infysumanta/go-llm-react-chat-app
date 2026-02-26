@@ -4,12 +4,20 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 
 	_ "modernc.org/sqlite"
 )
 
 func InitDB() (*sql.DB, error) {
-	db, err := sql.Open("sqlite", "chat.db")
+	dbPath := "chat.db"
+	if dir := os.Getenv("DATA_DIR"); dir != "" {
+		os.MkdirAll(dir, 0755)
+		dbPath = filepath.Join(dir, "chat.db")
+	}
+
+	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
@@ -29,7 +37,7 @@ func InitDB() (*sql.DB, error) {
 		return nil, fmt.Errorf("migration failed: %w", err)
 	}
 
-	log.Println("Database initialized: chat.db")
+	log.Println("Database initialized:", dbPath)
 	return db, nil
 }
 
