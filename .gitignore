@@ -40,3 +40,6 @@ node_modules
 _db/
 go-llm-react-chat-app
 llm-chat
+
+# Air hot reload
+tmp/

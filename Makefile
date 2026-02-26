@@ -2,6 +2,7 @@
 
 BINARY := llm-chat
 IMAGE := llm-chat
+AIR := $(shell go env GOPATH)/bin/air
 
 all: build
 
@@ -26,8 +27,21 @@ build: frontend backend
 run: build
 	./$(BINARY)
 
-# Dev mode: run frontend dev server
+# Dev mode: Go backend (hot reload) + Vite frontend dev server
 dev:
+	@echo "Starting Go backend (air) on :8080 and Vite dev server on :5173..."
+	@echo "Open http://localhost:5173 in your browser"
+	@trap 'kill 0' EXIT; \
+	$(AIR) & \
+	cd frontend && npm run dev & \
+	wait
+
+# Dev mode: Go backend only with hot reload
+dev-back:
+	$(AIR)
+
+# Dev mode: frontend only
+dev-front:
 	cd frontend && npm run dev
 
 # Build Docker image
