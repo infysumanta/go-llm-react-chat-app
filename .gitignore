@@ -38,3 +38,5 @@ node_modules
 *.db-wal
 *.db-shm
 _db/
+go-llm-react-chat-app
+llm-chat

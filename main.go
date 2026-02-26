@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -47,13 +48,31 @@ func main() {
 	mux.HandleFunc("GET /api/channels/{id}", ch.GetChannel)
 	mux.HandleFunc("PUT /api/channels/{id}", ch.UpdateChannel)
 	mux.HandleFunc("DELETE /api/channels/{id}", ch.DeleteChannel)
+	mux.HandleFunc("GET /api/channels/{id}/conversations", ch.ListChannelConversations)
 
-	// Static files
+	// Static files with SPA fallback for client-side routing
 	distFS, err := fs.Sub(staticFiles, "dist")
 	if err != nil {
 		log.Fatal("Failed to load static files:", err)
 	}
-	mux.Handle("/", http.FileServer(http.FS(distFS)))
+	fileServer := http.FileServer(http.FS(distFS))
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			http.NotFound(w, r)
+			return
+		}
+		path := strings.TrimPrefix(r.URL.Path, "/")
+		if path != "" {
+			if f, err := distFS.Open(path); err == nil {
+				f.Close()
+				fileServer.ServeHTTP(w, r)
+				return
+			}
+		}
+		// SPA fallback: serve index.html for client-side routes
+		r.URL.Path = "/"
+		fileServer.ServeHTTP(w, r)
+	})
 
 	fmt.Println("Server running on http://localhost:8080")
 	log.Fatal(http.ListenAndServe(":8080", mux))

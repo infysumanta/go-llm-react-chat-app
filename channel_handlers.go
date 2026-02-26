@@ -208,6 +208,41 @@ func (ch *ChannelHandlers) UpdateChannel(w http.ResponseWriter, r *http.Request)
 	json.NewEncoder(w).Encode(c)
 }
 
+// GET /api/channels/{id}/conversations
+func (ch *ChannelHandlers) ListChannelConversations(w http.ResponseWriter, r *http.Request) {
+	channelID := r.PathValue("id")
+
+	rows, err := ch.db.Query(
+		`SELECT c.id, c.title, c.model, c.channel, c.channel_id, c.telegram_chat_id, c.created_at, c.updated_at,
+		 (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id) as msg_count
+		 FROM conversations c WHERE c.channel_id = ? ORDER BY c.updated_at DESC`,
+		channelID,
+	)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	type ConvWithCount struct {
+		Conversation
+		MessageCount int `json:"messageCount"`
+	}
+
+	convs := []ConvWithCount{}
+	for rows.Next() {
+		var c ConvWithCount
+		if err := rows.Scan(&c.ID, &c.Title, &c.Model, &c.Channel, &c.ChannelID, &c.TelegramChatID, &c.CreatedAt, &c.UpdatedAt, &c.MessageCount); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		convs = append(convs, c)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(convs)
+}
+
 // DELETE /api/channels/{id}
 func (ch *ChannelHandlers) DeleteChannel(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")

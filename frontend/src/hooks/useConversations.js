@@ -9,8 +9,9 @@ export function useConversations() {
       const res = await fetch("/api/conversations");
       const data = await res.json();
       setConversations(data);
+      return data;
     } catch {
-      // silently fail
+      return [];
     } finally {
       setLoading(false);
     }

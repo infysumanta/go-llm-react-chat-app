@@ -8,7 +8,7 @@ export default function ChatHeader({
   return (
     <header className="flex items-center justify-between px-4 md:px-6 py-3 border-b border-gray-800 bg-gray-900/80 backdrop-blur-sm">
       <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center">
+        <div className="w-8 h-8 rounded-lg bg-linear-to-br from-violet-600 to-indigo-600 flex items-center justify-center">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="18"
@@ -42,6 +42,7 @@ export default function ChatHeader({
           ))}
         </select>
         <button
+          type="button"
           onClick={onOpenSettings}
           className="p-2 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-gray-200 transition-colors cursor-pointer"
           title="Settings"
