@@ -1,11 +1,15 @@
-import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+
+import type { Channel, ConversationWithCount } from "../types";
 
 export default function BotDetail() {
-  const { channelId } = useParams();
+  const { channelId } = useParams<{ channelId: string }>();
   const navigate = useNavigate();
-  const [channel, setChannel] = useState(null);
-  const [conversations, setConversations] = useState([]);
+  const [channel, setChannel] = useState<Channel | null>(null);
+  const [conversations, setConversations] = useState<ConversationWithCount[]>(
+    [],
+  );
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -13,7 +17,7 @@ export default function BotDetail() {
       fetch(`/api/channels/${channelId}`).then((r) => r.json()),
       fetch(`/api/channels/${channelId}/conversations`).then((r) => r.json()),
     ])
-      .then(([ch, convs]) => {
+      .then(([ch, convs]: [Channel, ConversationWithCount[]]) => {
         setChannel(ch);
         setConversations(convs || []);
       })
@@ -50,6 +54,7 @@ export default function BotDetail() {
               strokeLinecap="round"
               strokeLinejoin="round"
             >
+              <title>Back</title>
               <path d="M19 12H5M12 19l-7-7 7-7" />
             </svg>
           </button>
@@ -82,6 +87,7 @@ export default function BotDetail() {
                 strokeLinejoin="round"
                 className="mx-auto mb-3 text-gray-600"
               >
+                <title>Conversations</title>
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
               </svg>
               <p className="text-sm">No conversations yet.</p>
@@ -120,6 +126,7 @@ export default function BotDetail() {
                     strokeLinejoin="round"
                     className="text-gray-600 flex-shrink-0 ml-3"
                   >
+                    <title>Open</title>
                     <path d="M9 18l6-6-6-6" />
                   </svg>
                 </button>

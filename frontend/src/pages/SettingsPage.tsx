@@ -1,13 +1,15 @@
-import { useState, useEffect } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+
 import { useChannels } from "../hooks/useChannels";
+import type { Channel, Model } from "../types";
 
 export default function SettingsPage() {
   const navigate = useNavigate();
   const { channels, createChannel, updateChannel, deleteChannel } =
     useChannels();
-  const [models, setModels] = useState([]);
-  const [editingId, setEditingId] = useState(null);
+  const [models, setModels] = useState<Model[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -21,7 +23,7 @@ export default function SettingsPage() {
   useEffect(() => {
     fetch("/api/models")
       .then((r) => r.json())
-      .then(setModels)
+      .then((data: Model[]) => setModels(data))
       .catch(() => {});
   }, []);
 
@@ -40,7 +42,7 @@ export default function SettingsPage() {
     setShowForm(true);
   };
 
-  const handleEdit = (ch) => {
+  const handleEdit = (ch: Channel) => {
     setFormName(ch.name);
     setFormToken("");
     setFormPrompt(ch.systemPrompt);
@@ -57,7 +59,7 @@ export default function SettingsPage() {
     resetForm();
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setError("");
@@ -84,13 +86,13 @@ export default function SettingsPage() {
       }
       handleCancel();
     } catch (err) {
-      setError(err.message || "Failed to save");
+      setError(err instanceof Error ? err.message : "Failed to save");
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: string) => {
     if (!confirm("Delete this bot? It will stop responding immediately."))
       return;
     try {
@@ -121,6 +123,7 @@ export default function SettingsPage() {
               strokeLinecap="round"
               strokeLinejoin="round"
             >
+              <title>Back</title>
               <path d="M19 12H5M12 19l-7-7 7-7" />
             </svg>
           </button>
@@ -149,30 +152,30 @@ export default function SettingsPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">
                   Bot Name
+                  <input
+                    type="text"
+                    value={formName}
+                    onChange={(e) => setFormName(e.target.value)}
+                    placeholder="e.g. Support Bot"
+                    required
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-violet-500/50 mt-1 font-normal"
+                  />
                 </label>
-                <input
-                  type="text"
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  placeholder="e.g. Support Bot"
-                  required
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
-                />
               </div>
 
               {!editingId && (
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-1">
                     Bot Token
+                    <input
+                      type="password"
+                      value={formToken}
+                      onChange={(e) => setFormToken(e.target.value)}
+                      placeholder="Paste your Telegram bot token"
+                      required
+                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-violet-500/50 mt-1 font-normal"
+                    />
                   </label>
-                  <input
-                    type="password"
-                    value={formToken}
-                    onChange={(e) => setFormToken(e.target.value)}
-                    placeholder="Paste your Telegram bot token"
-                    required
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
-                  />
                   <p className="mt-1 text-xs text-gray-500">
                     Get a token from @BotFather on Telegram
                   </p>
@@ -182,31 +185,31 @@ export default function SettingsPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">
                   System Prompt
+                  <textarea
+                    value={formPrompt}
+                    onChange={(e) => setFormPrompt(e.target.value)}
+                    placeholder="You are a helpful assistant..."
+                    rows={3}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none mt-1 font-normal"
+                  />
                 </label>
-                <textarea
-                  value={formPrompt}
-                  onChange={(e) => setFormPrompt(e.target.value)}
-                  placeholder="You are a helpful assistant..."
-                  rows={3}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none"
-                />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">
                   Model
+                  <select
+                    value={formModel}
+                    onChange={(e) => setFormModel(e.target.value)}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-violet-500/50 cursor-pointer mt-1 font-normal"
+                  >
+                    {models.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </select>
                 </label>
-                <select
-                  value={formModel}
-                  onChange={(e) => setFormModel(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-violet-500/50 cursor-pointer"
-                >
-                  {models.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name}
-                    </option>
-                  ))}
-                </select>
               </div>
 
               {editingId && (
@@ -230,11 +233,7 @@ export default function SettingsPage() {
                   disabled={saving}
                   className="px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 rounded-lg text-sm font-medium text-white transition-colors cursor-pointer"
                 >
-                  {saving
-                    ? "Saving..."
-                    : editingId
-                      ? "Update Bot"
-                      : "Add Bot"}
+                  {saving ? "Saving..." : editingId ? "Update Bot" : "Add Bot"}
                 </button>
                 <button
                   type="button"
@@ -261,6 +260,7 @@ export default function SettingsPage() {
                     strokeLinejoin="round"
                     className="mx-auto mb-3 text-gray-600"
                   >
+                    <title>Telegram</title>
                     <path d="M21.198 2.433a2.242 2.242 0 0 0-1.022.215l-16.5 8.25a2.25 2.25 0 0 0 .126 4.073l4.5 1.5 2.25 6a1.5 1.5 0 0 0 2.652.378L15.5 19.5l4.5 1.5a2.25 2.25 0 0 0 2.965-1.768l1.5-15A2.25 2.25 0 0 0 21.198 2.433z" />
                   </svg>
                   <p className="text-sm">No Telegram bots configured yet.</p>
@@ -310,9 +310,7 @@ export default function SettingsPage() {
                         <div className="flex items-center gap-1 ml-3">
                           <button
                             type="button"
-                            onClick={() =>
-                              navigate(`/settings/${ch.id}`)
-                            }
+                            onClick={() => navigate(`/settings/${ch.id}`)}
                             className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-gray-200 transition-colors cursor-pointer"
                             title="View conversations"
                           >
@@ -327,6 +325,7 @@ export default function SettingsPage() {
                               strokeLinecap="round"
                               strokeLinejoin="round"
                             >
+                              <title>Conversations</title>
                               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                             </svg>
                           </button>
@@ -347,6 +346,7 @@ export default function SettingsPage() {
                               strokeLinecap="round"
                               strokeLinejoin="round"
                             >
+                              <title>Edit</title>
                               <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
                             </svg>
                           </button>
@@ -367,6 +367,7 @@ export default function SettingsPage() {
                               strokeLinecap="round"
                               strokeLinejoin="round"
                             >
+                              <title>Delete</title>
                               <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
                             </svg>
                           </button>
@@ -393,6 +394,7 @@ export default function SettingsPage() {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 >
+                  <title>Add</title>
                   <path d="M12 5v14M5 12h14" />
                 </svg>
                 Add Telegram Bot

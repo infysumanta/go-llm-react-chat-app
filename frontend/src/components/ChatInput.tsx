@@ -1,29 +1,41 @@
-import { useRef } from "react";
+import { type FormEvent, type KeyboardEvent, useRef } from "react";
 
-export default function ChatInput({ onSend, isStreaming, onStop }) {
-  const textareaRef = useRef(null);
+interface ChatInputProps {
+  onSend: (text: string) => void;
+  isStreaming: boolean;
+  onStop: () => void;
+}
+
+export default function ChatInput({
+  onSend,
+  isStreaming,
+  onStop,
+}: ChatInputProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const inputRef = useRef("");
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e?: FormEvent) => {
     e?.preventDefault();
     const text = textareaRef.current?.value?.trim();
     if (!text || isStreaming) return;
     onSend(text);
-    textareaRef.current.value = "";
-    textareaRef.current.style.height = "auto";
+    if (textareaRef.current) {
+      textareaRef.current.value = "";
+      textareaRef.current.style.height = "auto";
+    }
     inputRef.current = "";
   };
 
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
     }
   };
 
-  const autoResize = (el) => {
+  const autoResize = (el: HTMLTextAreaElement) => {
     el.style.height = "auto";
-    el.style.height = Math.min(el.scrollHeight, 160) + "px";
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
   };
 
   return (
@@ -58,6 +70,7 @@ export default function ChatInput({ onSend, isStreaming, onStop }) {
               viewBox="0 0 24 24"
               fill="currentColor"
             >
+              <title>Stop</title>
               <rect x="6" y="6" width="12" height="12" rx="2" />
             </svg>
           </button>
@@ -73,6 +86,7 @@ export default function ChatInput({ onSend, isStreaming, onStop }) {
               viewBox="0 0 24 24"
               fill="currentColor"
             >
+              <title>Send</title>
               <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
             </svg>
           </button>

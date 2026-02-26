@@ -1,23 +1,25 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
 import { useChat } from "@ai-sdk/react";
 import { TextStreamChatTransport } from "ai";
-import Sidebar from "../components/Sidebar";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+
 import ChatHeader from "../components/ChatHeader";
-import ChatMessages from "../components/ChatMessages";
 import ChatInput from "../components/ChatInput";
+import ChatMessages from "../components/ChatMessages";
 import EmptyState from "../components/EmptyState";
-import { useHealthCheck } from "../hooks/useHealthCheck";
-import { useConversations } from "../hooks/useConversations";
+import Sidebar from "../components/Sidebar";
 import { useChannels } from "../hooks/useChannels";
+import { useConversations } from "../hooks/useConversations";
+import { useHealthCheck } from "../hooks/useHealthCheck";
+import type { Model } from "../types";
 
 const DEFAULT_MODEL = "gpt-5-nano";
 
 export default function ChatPage() {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL);
-  const [models, setModels] = useState([]);
+  const [models, setModels] = useState<Model[]>([]);
   const isOnline = useHealthCheck();
   const {
     conversations,
@@ -43,11 +45,12 @@ export default function ChatPage() {
   useEffect(() => {
     fetch("/api/models")
       .then((r) => r.json())
-      .then(setModels)
+      .then((data: Model[]) => setModels(data))
       .catch(() => {});
   }, []);
 
   // Load conversation when URL param changes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only re-run when id changes
   useEffect(() => {
     if (id) {
       if (justCreated.current) {
@@ -64,7 +67,7 @@ export default function ChatPage() {
         const sdkMessages = conv.messages.map((m) => ({
           id: m.id,
           role: m.role,
-          parts: [{ type: "text", text: m.content }],
+          parts: [{ type: "text" as const, text: m.content }],
         }));
         setMessages(sdkMessages);
       });
@@ -72,17 +75,15 @@ export default function ChatPage() {
       setMessages([]);
       setActiveChannel("web");
     }
-  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
-
+  }, [id]);
   // After streaming completes, refresh conversations and navigate if new chat
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only re-run on status/messages.length change
   useEffect(() => {
     if (status === "ready" && messages.length > 0) {
       fetchConversations().then((convs) => {
         if (!id && convs && convs.length > 0) {
           // Find the newest web conversation
-          const newest = convs.find(
-            (c) => !c.channel || c.channel === "web",
-          );
+          const newest = convs.find((c) => !c.channel || c.channel === "web");
           if (newest) {
             justCreated.current = true;
             navigate(`/c/${newest.id}`, { replace: true });
@@ -90,10 +91,9 @@ export default function ChatPage() {
         }
       });
     }
-  }, [status, messages.length]); // eslint-disable-line react-hooks/exhaustive-deps
-
+  }, [status, messages.length]);
   const handleDeleteConversation = useCallback(
-    async (convId) => {
+    async (convId: string) => {
       await deleteConversation(convId);
       if (convId === id) {
         navigate("/");
@@ -103,14 +103,14 @@ export default function ChatPage() {
   );
 
   const handleSend = useCallback(
-    (text) => {
+    (text: string) => {
       sendMessage({ text });
     },
     [sendMessage],
   );
 
   const handleSuggestion = useCallback(
-    (text) => {
+    (text: string) => {
       handleSend(text);
     },
     [handleSend],
@@ -148,7 +148,18 @@ export default function ChatPage() {
         {activeChannel === "telegram" ? (
           <div className="border-t border-gray-800 bg-gray-900/80 backdrop-blur-sm px-4 py-3">
             <div className="max-w-3xl mx-auto flex items-center justify-center gap-2 text-sm text-gray-500 py-2">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <title>Telegram</title>
                 <path d="M21.198 2.433a2.242 2.242 0 0 0-1.022.215l-16.5 8.25a2.25 2.25 0 0 0 .126 4.073l4.5 1.5 2.25 6a1.5 1.5 0 0 0 2.652.378L15.5 19.5l4.5 1.5a2.25 2.25 0 0 0 2.965-1.768l1.5-15A2.25 2.25 0 0 0 21.198 2.433z" />
               </svg>
               Telegram conversation — reply from Telegram to continue

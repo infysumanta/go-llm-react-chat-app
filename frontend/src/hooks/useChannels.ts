@@ -1,13 +1,19 @@
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
+
+import type {
+  Channel,
+  CreateChannelPayload,
+  UpdateChannelPayload,
+} from "../types";
 
 export function useChannels() {
-  const [channels, setChannels] = useState([]);
+  const [channels, setChannels] = useState<Channel[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchChannels = useCallback(async () => {
     try {
       const res = await fetch("/api/channels");
-      const data = await res.json();
+      const data: Channel[] = await res.json();
       setChannels(data);
     } catch {
       // silently fail
@@ -21,17 +27,17 @@ export function useChannels() {
   }, [fetchChannels]);
 
   const createChannel = useCallback(
-    async ({ name, botToken, systemPrompt, model }) => {
+    async (payload: CreateChannelPayload) => {
       const res = await fetch("/api/channels", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, botToken, systemPrompt, model }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const text = await res.text();
         throw new Error(text);
       }
-      const channel = await res.json();
+      const channel: Channel = await res.json();
       await fetchChannels();
       return channel;
     },
@@ -39,7 +45,7 @@ export function useChannels() {
   );
 
   const updateChannel = useCallback(
-    async (id, updates) => {
+    async (id: string, updates: UpdateChannelPayload) => {
       const res = await fetch(`/api/channels/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -49,7 +55,7 @@ export function useChannels() {
         const text = await res.text();
         throw new Error(text);
       }
-      const channel = await res.json();
+      const channel: Channel = await res.json();
       await fetchChannels();
       return channel;
     },
@@ -57,7 +63,7 @@ export function useChannels() {
   );
 
   const deleteChannel = useCallback(
-    async (id) => {
+    async (id: string) => {
       await fetch(`/api/channels/${id}`, { method: "DELETE" });
       await fetchChannels();
     },

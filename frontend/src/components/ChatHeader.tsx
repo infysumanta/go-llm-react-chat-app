@@ -1,10 +1,20 @@
+import type { Model } from "../types";
+
+interface ChatHeaderProps {
+  models: Model[];
+  selectedModel: string;
+  onModelChange: (model: string) => void;
+  isOnline: boolean | null;
+  onOpenSettings: () => void;
+}
+
 export default function ChatHeader({
   models,
   selectedModel,
   onModelChange,
   isOnline,
   onOpenSettings,
-}) {
+}: ChatHeaderProps) {
   return (
     <header className="flex items-center justify-between px-4 md:px-6 py-3 border-b border-gray-800 bg-gray-900/80 backdrop-blur-sm">
       <div className="flex items-center gap-3">
@@ -20,6 +30,7 @@ export default function ChatHeader({
             strokeLinecap="round"
             strokeLinejoin="round"
           >
+            <title>Logo</title>
             <path d="M12 2a8 8 0 0 0-8 8c0 3.4 2.1 6.3 5 7.5V20a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-2.5c2.9-1.2 5-4.1 5-7.5a8 8 0 0 0-8-8z" />
             <path d="M10 22h4" />
           </svg>
@@ -58,6 +69,7 @@ export default function ChatHeader({
             strokeLinecap="round"
             strokeLinejoin="round"
           >
+            <title>Settings</title>
             <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
             <circle cx="12" cy="12" r="3" />
           </svg>

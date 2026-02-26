@@ -1,7 +1,7 @@
-import { Routes, Route } from "react-router-dom";
+import { Route, Routes } from "react-router-dom";
+import BotDetail from "./pages/BotDetail";
 import ChatPage from "./pages/ChatPage";
 import SettingsPage from "./pages/SettingsPage";
-import BotDetail from "./pages/BotDetail";
 
 function App() {
   return (

@@ -1,8 +1,19 @@
 import { useEffect, useRef } from "react";
 
-export default function ChatMessages({ messages, isStreaming }) {
-  const endRef = useRef(null);
+import type { SDKMessage } from "../types";
 
+interface ChatMessagesProps {
+  messages: SDKMessage[];
+  isStreaming: boolean;
+}
+
+export default function ChatMessages({
+  messages,
+  isStreaming,
+}: ChatMessagesProps) {
+  const endRef = useRef<HTMLDivElement>(null);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: scroll on every messages change
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -27,6 +38,7 @@ export default function ChatMessages({ messages, isStreaming }) {
                 strokeLinecap="round"
                 strokeLinejoin="round"
               >
+                <title>Assistant</title>
                 <path d="M12 2a8 8 0 0 0-8 8c0 3.4 2.1 6.3 5 7.5V20a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-2.5c2.9-1.2 5-4.1 5-7.5a8 8 0 0 0-8-8z" />
                 <path d="M10 22h4" />
               </svg>
@@ -56,14 +68,14 @@ export default function ChatMessages({ messages, isStreaming }) {
   );
 }
 
-function getMessageText(msg) {
+function getMessageText(msg: SDKMessage): string {
   if (msg.parts) {
     return msg.parts
       .filter((p) => p.type === "text")
       .map((p) => p.text)
       .join("");
   }
-  return msg.content || "";
+  return "";
 }
 
 function TypingIndicator() {
