@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-import type { Conversation, ConversationWithCount } from "../types";
+import type { Conversation, ConversationWithCount } from "@/types";
 
 export function useConversations() {
   const [conversations, setConversations] = useState<ConversationWithCount[]>(

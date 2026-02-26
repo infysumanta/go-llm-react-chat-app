@@ -3,22 +3,20 @@ import { TextStreamChatTransport } from "ai";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
-import ChatHeader from "../components/ChatHeader";
-import ChatInput from "../components/ChatInput";
-import ChatMessages from "../components/ChatMessages";
-import EmptyState from "../components/EmptyState";
-import Sidebar from "../components/Sidebar";
-import { useChannels } from "../hooks/useChannels";
-import { useConversations } from "../hooks/useConversations";
-import { useHealthCheck } from "../hooks/useHealthCheck";
-import type { Model } from "../types";
-
-const DEFAULT_MODEL = "gpt-5-nano";
+import ChatHeader from "@/components/ChatHeader";
+import ChatInput from "@/components/ChatInput";
+import ChatMessages from "@/components/ChatMessages";
+import EmptyState from "@/components/EmptyState";
+import Sidebar from "@/components/Sidebar";
+import { useChannels } from "@/hooks/useChannels";
+import { useConversations } from "@/hooks/useConversations";
+import { useHealthCheck } from "@/hooks/useHealthCheck";
+import type { Model } from "@/types";
 
 export default function ChatPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL);
+  const [selectedModel, setSelectedModel] = useState("");
   const [models, setModels] = useState<Model[]>([]);
   const isOnline = useHealthCheck();
   const {
@@ -41,13 +39,20 @@ export default function ChatPage() {
   const justCreated = useRef(false);
   const [activeChannel, setActiveChannel] = useState("web");
 
-  // Fetch available models on mount
+  // Fetch available models on mount and set default
   useEffect(() => {
     fetch("/api/models")
       .then((r) => r.json())
-      .then((data: Model[]) => setModels(data))
+      .then((data: Model[]) => {
+        setModels(data);
+        // Set first available model as default if none selected
+        const first = data[0];
+        if (!selectedModel && first) {
+          setSelectedModel(first.id);
+        }
+      })
       .catch(() => {});
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load conversation when URL param changes
   // biome-ignore lint/correctness/useExhaustiveDependencies: only re-run when id changes

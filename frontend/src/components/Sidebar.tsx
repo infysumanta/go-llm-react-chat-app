@@ -1,4 +1,4 @@
-import type { Channel, ConversationWithCount } from "../types";
+import type { Channel, ConversationWithCount } from "@/types";
 
 interface SidebarProps {
   conversations: ConversationWithCount[];

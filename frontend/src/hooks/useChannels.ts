@@ -4,7 +4,7 @@ import type {
   Channel,
   CreateChannelPayload,
   UpdateChannelPayload,
-} from "../types";
+} from "@/types";
 
 export function useChannels() {
   const [channels, setChannels] = useState<Channel[]>([]);

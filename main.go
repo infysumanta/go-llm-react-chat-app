@@ -2,6 +2,7 @@ package main
 
 import (
 	"embed"
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"log"
@@ -9,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/infysumanta/go-llm-react-chat-app/internal/handler"
+	"github.com/infysumanta/go-llm-react-chat-app/internal/provider"
 	"github.com/infysumanta/go-llm-react-chat-app/internal/store"
 	"github.com/infysumanta/go-llm-react-chat-app/internal/telegram"
 
@@ -27,19 +29,32 @@ func main() {
 	}
 	defer db.Close()
 
-	h := handler.NewHandlers(db)
+	// Set up multi-provider registry from env vars
+	reg := provider.NewRegistry()
+	provider.SetupFromEnv(reg)
+
+	h := handler.NewHandlers(db, reg)
 
 	// Start Telegram bot manager
-	botManager := telegram.NewBotManager(db)
+	botManager := telegram.NewBotManager(db, reg)
 	go botManager.LoadAndStartAll()
 
-	ch := handler.NewChannelHandlers(db, botManager)
+	ch := handler.NewChannelHandlers(db, botManager, reg)
 
 	mux := http.NewServeMux()
 
 	// API routes
 	mux.HandleFunc("GET /api/health", h.HealthCheck)
 	mux.HandleFunc("GET /api/models", h.ListModels)
+	mux.HandleFunc("GET /api/providers", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(reg.ProviderNames())
+	})
+	mux.HandleFunc("POST /api/models/refresh", func(w http.ResponseWriter, r *http.Request) {
+		reg.RefreshModels()
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(reg.AllModels())
+	})
 	mux.HandleFunc("GET /api/conversations", h.ListConversations)
 	mux.HandleFunc("POST /api/conversations", h.CreateConversation)
 	mux.HandleFunc("GET /api/conversations/{id}", h.GetConversation)

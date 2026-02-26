@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 
-import type { SDKMessage } from "../types";
+import type { SDKMessage } from "@/types";
 
 interface ChatMessagesProps {
   messages: SDKMessage[];

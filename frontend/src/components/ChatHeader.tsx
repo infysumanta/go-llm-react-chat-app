@@ -1,4 +1,14 @@
-import type { Model } from "../types";
+import type { Model } from "@/types";
+import { groupModelsByProvider } from "@/lib/models";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface ChatHeaderProps {
   models: Model[];
@@ -15,6 +25,8 @@ export default function ChatHeader({
   isOnline,
   onOpenSettings,
 }: ChatHeaderProps) {
+  const groups = groupModelsByProvider(models);
+
   return (
     <header className="flex items-center justify-between px-4 md:px-6 py-3 border-b border-gray-800 bg-gray-900/80 backdrop-blur-sm">
       <div className="flex items-center gap-3">
@@ -41,17 +53,23 @@ export default function ChatHeader({
         </div>
       </div>
       <div className="flex items-center gap-3">
-        <select
-          value={selectedModel}
-          onChange={(e) => onModelChange(e.target.value)}
-          className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-gray-300 focus:outline-none focus:ring-2 focus:ring-violet-500/50 cursor-pointer"
-        >
-          {models.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </select>
+        <Select value={selectedModel} onValueChange={onModelChange}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Select model" />
+          </SelectTrigger>
+          <SelectContent>
+            {groups.map((group) => (
+              <SelectGroup key={group.provider}>
+                <SelectLabel>{group.provider}</SelectLabel>
+                {group.models.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.name}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            ))}
+          </SelectContent>
+        </Select>
         <button
           type="button"
           onClick={onOpenSettings}

@@ -1,6 +1,7 @@
 export interface Model {
   id: string;
   name: string;
+  provider: string;
 }
 
 export interface Channel {

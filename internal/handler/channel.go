@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/infysumanta/go-llm-react-chat-app/internal/model"
+	"github.com/infysumanta/go-llm-react-chat-app/internal/provider"
 	"github.com/infysumanta/go-llm-react-chat-app/internal/telegram"
 
 	"github.com/google/uuid"
@@ -15,10 +16,11 @@ import (
 type ChannelHandlers struct {
 	db         *sql.DB
 	botManager *telegram.BotManager
+	reg        *provider.Registry
 }
 
-func NewChannelHandlers(db *sql.DB, bm *telegram.BotManager) *ChannelHandlers {
-	return &ChannelHandlers{db: db, botManager: bm}
+func NewChannelHandlers(db *sql.DB, bm *telegram.BotManager, reg *provider.Registry) *ChannelHandlers {
+	return &ChannelHandlers{db: db, botManager: bm, reg: reg}
 }
 
 // GET /api/channels
@@ -66,8 +68,8 @@ func (ch *ChannelHandlers) CreateChannel(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "name and botToken are required", http.StatusBadRequest)
 		return
 	}
-	if req.Model == "" || !model.IsValidModel(req.Model) {
-		req.Model = "gpt-5-nano"
+	if req.Model == "" || !ch.reg.IsValidModel(req.Model) {
+		req.Model = ch.reg.DefaultModel()
 	}
 
 	// Validate the bot token with Telegram API
@@ -174,7 +176,7 @@ func (ch *ChannelHandlers) UpdateChannel(w http.ResponseWriter, r *http.Request)
 	if req.SystemPrompt != nil {
 		c.SystemPrompt = *req.SystemPrompt
 	}
-	if req.Model != nil && model.IsValidModel(*req.Model) {
+	if req.Model != nil && ch.reg.IsValidModel(*req.Model) {
 		c.Model = *req.Model
 	}
 	if req.Enabled != nil {

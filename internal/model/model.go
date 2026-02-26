@@ -36,28 +36,3 @@ type Message struct {
 	Channel        string    `json:"channel"`
 	CreatedAt      time.Time `json:"createdAt"`
 }
-
-type ModelInfo struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-}
-
-type OpenAIMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
-var AvailableModels = []ModelInfo{
-	{ID: "gpt-5", Name: "GPT-5"},
-	{ID: "gpt-5-mini", Name: "GPT-5 Mini"},
-	{ID: "gpt-5-nano", Name: "GPT-5 Nano"},
-}
-
-func IsValidModel(m string) bool {
-	for _, info := range AvailableModels {
-		if info.ID == m {
-			return true
-		}
-	}
-	return false
-}

@@ -5,6 +5,13 @@ services:
       - "8080:8080"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY}
+      - COHERE_API_KEY=${COHERE_API_KEY}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL}
+      - LMSTUDIO_BASE_URL=${LMSTUDIO_BASE_URL}
     volumes:
       - ./data:/app/data
     restart: unless-stopped

@@ -7,18 +7,18 @@ import (
 	"strings"
 	"time"
 
-	"github.com/infysumanta/go-llm-react-chat-app/internal/llm"
-	"github.com/infysumanta/go-llm-react-chat-app/internal/model"
+	"github.com/infysumanta/go-llm-react-chat-app/internal/provider"
 
 	"github.com/google/uuid"
 )
 
 type Handlers struct {
-	db *sql.DB
+	db  *sql.DB
+	reg *provider.Registry
 }
 
-func NewHandlers(db *sql.DB) *Handlers {
-	return &Handlers{db: db}
+func NewHandlers(db *sql.DB, reg *provider.Registry) *Handlers {
+	return &Handlers{db: db, reg: reg}
 }
 
 // GET /api/health
@@ -34,7 +34,7 @@ func (h *Handlers) HealthCheck(w http.ResponseWriter, r *http.Request) {
 // GET /api/models
 func (h *Handlers) ListModels(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(model.AvailableModels)
+	json.NewEncoder(w).Encode(h.reg.AllModels())
 }
 
 // GET /api/conversations
@@ -48,9 +48,19 @@ func (h *Handlers) ListConversations(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	conversations := []model.Conversation{}
+	type conversation struct {
+		ID        string    `json:"id"`
+		Title     string    `json:"title"`
+		Model     string    `json:"model"`
+		Channel   string    `json:"channel"`
+		ChannelID *string   `json:"channelId,omitempty"`
+		CreatedAt time.Time `json:"createdAt"`
+		UpdatedAt time.Time `json:"updatedAt"`
+	}
+
+	conversations := []conversation{}
 	for rows.Next() {
-		var c model.Conversation
+		var c conversation
 		if err := rows.Scan(&c.ID, &c.Title, &c.Model, &c.Channel, &c.ChannelID, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -69,15 +79,14 @@ func (h *Handlers) CreateConversation(w http.ResponseWriter, r *http.Request) {
 		Model string `json:"model"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		// Allow empty body — use defaults
 		req.Title = "New Chat"
-		req.Model = "gpt-5-nano"
+		req.Model = h.reg.DefaultModel()
 	}
 	if req.Title == "" {
 		req.Title = "New Chat"
 	}
-	if req.Model == "" || !model.IsValidModel(req.Model) {
-		req.Model = "gpt-5-nano"
+	if req.Model == "" || !h.reg.IsValidModel(req.Model) {
+		req.Model = h.reg.DefaultModel()
 	}
 
 	id := uuid.New().String()
@@ -92,7 +101,16 @@ func (h *Handlers) CreateConversation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	conv := model.Conversation{
+	type conversation struct {
+		ID        string    `json:"id"`
+		Title     string    `json:"title"`
+		Model     string    `json:"model"`
+		Channel   string    `json:"channel"`
+		CreatedAt time.Time `json:"createdAt"`
+		UpdatedAt time.Time `json:"updatedAt"`
+	}
+
+	conv := conversation{
 		ID:        id,
 		Title:     req.Title,
 		Model:     req.Model,
@@ -110,7 +128,29 @@ func (h *Handlers) CreateConversation(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) GetConversation(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
-	var conv model.Conversation
+	type message struct {
+		ID             string    `json:"id"`
+		ConversationID string    `json:"conversationId"`
+		Role           string    `json:"role"`
+		Content        string    `json:"content"`
+		Model          string    `json:"model,omitempty"`
+		Channel        string    `json:"channel"`
+		CreatedAt      time.Time `json:"createdAt"`
+	}
+
+	type conversation struct {
+		ID             string    `json:"id"`
+		Title          string    `json:"title"`
+		Model          string    `json:"model"`
+		Channel        string    `json:"channel"`
+		ChannelID      *string   `json:"channelId,omitempty"`
+		TelegramChatID *int64    `json:"telegramChatId,omitempty"`
+		CreatedAt      time.Time `json:"createdAt"`
+		UpdatedAt      time.Time `json:"updatedAt"`
+		Messages       []message `json:"messages,omitempty"`
+	}
+
+	var conv conversation
 	err := h.db.QueryRow(
 		"SELECT id, title, model, channel, channel_id, created_at, updated_at FROM conversations WHERE id = ?", id,
 	).Scan(&conv.ID, &conv.Title, &conv.Model, &conv.Channel, &conv.ChannelID, &conv.CreatedAt, &conv.UpdatedAt)
@@ -132,9 +172,9 @@ func (h *Handlers) GetConversation(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	conv.Messages = []model.Message{}
+	conv.Messages = []message{}
 	for rows.Next() {
-		var m model.Message
+		var m message
 		var mdl sql.NullString
 		if err := rows.Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &mdl, &m.Channel, &m.CreatedAt); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -202,8 +242,15 @@ func (h *Handlers) Chat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	modelName := req.Model
-	if modelName == "" || !model.IsValidModel(modelName) {
-		modelName = "gpt-5-nano"
+	if modelName == "" || !h.reg.IsValidModel(modelName) {
+		modelName = h.reg.DefaultModel()
+	}
+
+	// Resolve the provider for this model
+	p, err := h.reg.ProviderForModel(modelName)
+	if err != nil {
+		http.Error(w, "No provider available for model: "+modelName, http.StatusBadRequest)
+		return
 	}
 
 	// Extract the last user message text
@@ -257,8 +304,8 @@ func (h *Handlers) Chat(w http.ResponseWriter, r *http.Request) {
 	// Update conversation timestamp
 	h.db.Exec("UPDATE conversations SET updated_at = ? WHERE id = ?", time.Now(), convID)
 
-	// Convert AI SDK messages to OpenAI format
-	openaiMessages := convertToOpenAIMessages(req.Messages)
+	// Convert AI SDK messages to provider format
+	chatMessages := convertToChatMessages(req.Messages)
 
 	// Set up streaming response
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -272,7 +319,9 @@ func (h *Handlers) Chat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	stream := make(chan string)
-	go llm.StreamChat(openaiMessages, modelName, stream)
+	go func() {
+		_ = p.StreamChat(r.Context(), chatMessages, modelName, stream)
+	}()
 
 	var fullResponse strings.Builder
 	for chunk := range stream {
@@ -291,8 +340,8 @@ func (h *Handlers) Chat(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func convertToOpenAIMessages(messages []aiMessage) []model.OpenAIMessage {
-	var result []model.OpenAIMessage
+func convertToChatMessages(messages []aiMessage) []provider.ChatMessage {
+	var result []provider.ChatMessage
 	for _, msg := range messages {
 		var text strings.Builder
 		for _, part := range msg.Parts {
@@ -300,7 +349,7 @@ func convertToOpenAIMessages(messages []aiMessage) []model.OpenAIMessage {
 				text.WriteString(part.Text)
 			}
 		}
-		result = append(result, model.OpenAIMessage{
+		result = append(result, provider.ChatMessage{
 			Role:    msg.Role,
 			Content: text.String(),
 		})

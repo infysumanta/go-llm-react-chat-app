@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -8,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/infysumanta/go-llm-react-chat-app/internal/llm"
 	"github.com/infysumanta/go-llm-react-chat-app/internal/model"
+	"github.com/infysumanta/go-llm-react-chat-app/internal/provider"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/google/uuid"
@@ -26,6 +27,7 @@ func ValidateBotToken(token string) (string, error) {
 
 type BotManager struct {
 	db   *sql.DB
+	reg  *provider.Registry
 	mu   sync.RWMutex
 	bots map[string]*telegramBot // keyed by channel ID
 }
@@ -38,9 +40,10 @@ type telegramBot struct {
 	pendingNew sync.Map // chat IDs that requested /new
 }
 
-func NewBotManager(db *sql.DB) *BotManager {
+func NewBotManager(db *sql.DB, reg *provider.Registry) *BotManager {
 	return &BotManager{
 		db:   db,
+		reg:  reg,
 		bots: make(map[string]*telegramBot),
 	}
 }
@@ -269,17 +272,28 @@ func (bm *BotManager) handleMessage(tb *telegramBot, msg *tgbotapi.Message) {
 	messages, err := bm.loadHistory(convID)
 	if err != nil {
 		log.Printf("BotManager: failed to load history: %v", err)
-		messages = []model.OpenAIMessage{}
+		messages = []provider.ChatMessage{}
 	}
 
 	// Prepend system prompt if configured
 	if tb.channel.SystemPrompt != "" {
-		messages = append([]model.OpenAIMessage{{Role: "system", Content: tb.channel.SystemPrompt}}, messages...)
+		messages = append([]provider.ChatMessage{{Role: "system", Content: tb.channel.SystemPrompt}}, messages...)
 	}
 
-	// Call LLM
+	// Resolve provider for the channel's model
+	p, err := bm.reg.ProviderForModel(tb.channel.Model)
+	if err != nil {
+		log.Printf("BotManager: no provider for model %s: %v", tb.channel.Model, err)
+		reply := tgbotapi.NewMessage(chatID, "Sorry, the configured model is not available.")
+		tb.api.Send(reply)
+		return
+	}
+
+	// Call LLM via provider
 	stream := make(chan string)
-	go llm.StreamChat(messages, tb.channel.Model, stream)
+	go func() {
+		_ = p.StreamChat(context.Background(), messages, tb.channel.Model, stream)
+	}()
 
 	var fullResponse strings.Builder
 	for chunk := range stream {
@@ -333,7 +347,7 @@ func (bm *BotManager) findOrCreateConversation(tb *telegramBot, chatID int64, fi
 	return convID, nil
 }
 
-func (bm *BotManager) loadHistory(convID string) ([]model.OpenAIMessage, error) {
+func (bm *BotManager) loadHistory(convID string) ([]provider.ChatMessage, error) {
 	rows, err := bm.db.Query(
 		"SELECT role, content FROM messages WHERE conversation_id = ? ORDER BY created_at ASC",
 		convID,
@@ -343,9 +357,9 @@ func (bm *BotManager) loadHistory(convID string) ([]model.OpenAIMessage, error) 
 	}
 	defer rows.Close()
 
-	var messages []model.OpenAIMessage
+	var messages []provider.ChatMessage
 	for rows.Next() {
-		var m model.OpenAIMessage
+		var m provider.ChatMessage
 		if err := rows.Scan(&m.Role, &m.Content); err != nil {
 			return nil, err
 		}

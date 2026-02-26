@@ -1,8 +1,18 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { useChannels } from "../hooks/useChannels";
-import type { Channel, Model } from "../types";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useChannels } from "@/hooks/useChannels";
+import { groupModelsByProvider } from "@/lib/models";
+import type { Channel, Model } from "@/types";
 
 export default function SettingsPage() {
   const navigate = useNavigate();
@@ -17,21 +27,29 @@ export default function SettingsPage() {
   const [formName, setFormName] = useState("");
   const [formToken, setFormToken] = useState("");
   const [formPrompt, setFormPrompt] = useState("");
-  const [formModel, setFormModel] = useState("gpt-5-nano");
+  const [formModel, setFormModel] = useState("");
   const [formEnabled, setFormEnabled] = useState(true);
 
   useEffect(() => {
     fetch("/api/models")
       .then((r) => r.json())
-      .then((data: Model[]) => setModels(data))
+      .then((data: Model[]) => {
+        setModels(data);
+        const first = data[0];
+        if (first && !formModel) {
+          setFormModel(first.id);
+        }
+      })
       .catch(() => {});
-  }, []);
+  }, [formModel]);
+
+  const groups = groupModelsByProvider(models);
 
   const resetForm = () => {
     setFormName("");
     setFormToken("");
     setFormPrompt("");
-    setFormModel("gpt-5-nano");
+    setFormModel(models[0]?.id ?? "");
     setFormEnabled(true);
     setError("");
   };
@@ -59,7 +77,7 @@ export default function SettingsPage() {
     resetForm();
   };
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setError("");
@@ -196,20 +214,26 @@ export default function SettingsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
+                <span className="block text-sm font-medium text-gray-300 mb-1">
                   Model
-                  <select
-                    value={formModel}
-                    onChange={(e) => setFormModel(e.target.value)}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-violet-500/50 cursor-pointer mt-1 font-normal"
-                  >
-                    {models.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name}
-                      </option>
+                </span>
+                <Select value={formModel} onValueChange={setFormModel}>
+                  <SelectTrigger className="w-full mt-1">
+                    <SelectValue placeholder="Select model" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {groups.map((group) => (
+                      <SelectGroup key={group.provider}>
+                        <SelectLabel>{group.provider}</SelectLabel>
+                        {group.models.map((m) => (
+                          <SelectItem key={m.id} value={m.id}>
+                            {m.name}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
                     ))}
-                  </select>
-                </label>
+                  </SelectContent>
+                </Select>
               </div>
 
               {editingId && (
