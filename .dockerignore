@@ -1,9 +1,10 @@
 node_modules
 dist
 llm-chat
-go-llm-react-chat-app
+data
 *.db
 *.db-wal
 *.db-shm
 .env
 .git
+tmp

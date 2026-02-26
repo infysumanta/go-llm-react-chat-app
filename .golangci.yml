@@ -39,7 +39,7 @@ linters:
       - frontend
       - dist
       - tmp
-      - _db
+      - data
 
 formatters:
   enable:

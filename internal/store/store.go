@@ -11,11 +11,12 @@ import (
 )
 
 func InitDB() (*sql.DB, error) {
-	dbPath := "chat.db"
-	if dir := os.Getenv("DATA_DIR"); dir != "" {
-		os.MkdirAll(dir, 0755)
-		dbPath = filepath.Join(dir, "chat.db")
+	dir := os.Getenv("DATA_DIR")
+	if dir == "" {
+		dir = "data"
 	}
+	os.MkdirAll(dir, 0755)
+	dbPath := filepath.Join(dir, "chat.db")
 
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {

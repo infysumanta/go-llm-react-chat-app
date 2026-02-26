@@ -81,4 +81,4 @@ check: fmt lint
 clean:
 	rm -f $(BINARY)
 	rm -rf dist
-	rm -f chat.db chat.db-wal chat.db-shm
+	rm -rf data

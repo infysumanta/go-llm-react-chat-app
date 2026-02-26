@@ -1,6 +1,3 @@
-# If you prefer the allow list template instead of the deny list, see community template:
-# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
-#
 # Binaries for programs and plugins
 *.exe
 *.exe~
@@ -17,9 +14,6 @@ coverage.*
 *.coverprofile
 profile.cov
 
-# Dependency directories (remove the comment below to include it)
-# vendor/
-
 # Go workspace file
 go.work
 go.work.sum
@@ -33,12 +27,10 @@ go.work.sum
 dist
 node_modules
 
-# SQLite database files
-*.db
-*.db-wal
-*.db-shm
-_db/
-go-llm-react-chat-app
+# Data directory (SQLite database)
+data/
+
+# Build artifacts
 llm-chat
 
 # Air hot reload
